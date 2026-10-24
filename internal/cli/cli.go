@@ -18,6 +18,7 @@ import (
 	"github.com/jasonli0226/climan/internal/registry"
 	"github.com/jasonli0226/climan/internal/rules"
 	"github.com/jasonli0226/climan/internal/syncer"
+	"github.com/jasonli0226/climan/internal/tui"
 )
 
 const (
@@ -32,8 +33,8 @@ commands:
 `
 )
 
-// newInteractive builds the TUI chooser; set by the tui wiring.
-var newInteractive func() syncer.Chooser
+// newInteractive builds the TUI chooser.
+var newInteractive = func() syncer.Chooser { return tui.HuhChooser{} }
 
 // Run executes climan with args (without the program name) and returns the
 // process exit code.
@@ -104,8 +105,6 @@ func pickChooser(env platform.Env, dir string, batch, auto bool, stdin *os.File)
 		return syncer.AutoChooser{Rules: r}, nil
 	case !term.IsTerminal(int(stdin.Fd())):
 		return nil, errors.New("stdin is not a terminal; use --batch or --auto")
-	case newInteractive == nil:
-		return nil, errors.New("interactive mode is not available in this build; use --batch or --auto")
 	default:
 		return newInteractive(), nil
 	}
