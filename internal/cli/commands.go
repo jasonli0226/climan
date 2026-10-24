@@ -2,15 +2,18 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/jasonli0226/climan/internal/discover"
 	"github.com/jasonli0226/climan/internal/platform"
 	"github.com/jasonli0226/climan/internal/probe"
+	"github.com/jasonli0226/climan/internal/register"
 	"github.com/jasonli0226/climan/internal/registry"
 	"github.com/jasonli0226/climan/internal/status"
 	"github.com/jasonli0226/climan/internal/view"
@@ -146,5 +149,53 @@ func runStatus(cmd string, to registry.Status, args []string, stdout, stderr io.
 	if err != nil {
 		return fail(stderr, err)
 	}
+	return exitOK
+}
+
+// tagList splits a comma-separated --tags value, dropping empties.
+type tagList []string
+
+func (t *tagList) String() string { return strings.Join(*t, ",") }
+func (t *tagList) Set(s string) error {
+	for _, tag := range strings.Split(s, ",") {
+		if tag = strings.TrimSpace(tag); tag != "" {
+			*t = append(*t, tag)
+		}
+	}
+	return nil
+}
+
+func runRegister(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("register", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	desc := fs.String("desc", "", "one-line description")
+	var tags tagList
+	fs.Var(&tags, "tags", "comma-separated tags")
+	ids, err := parseInterleaved(fs, args)
+	if err != nil {
+		return exitUsage
+	}
+	if len(ids) != 1 {
+		fmt.Fprintf(stderr, "climan register: name exactly one id\n\n%s", usage)
+		return exitUsage
+	}
+	env := platform.Current()
+	dir, err := env.ConfigDir()
+	if err != nil {
+		return fail(stderr, err)
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fail(stderr, err)
+	}
+	key, err := register.Add(registry.Store{Dir: dir}, env, cwd, ids[0], *desc, tags)
+	if errors.Is(err, register.ErrBadID) {
+		fmt.Fprintf(stderr, "climan register: %v\n", err)
+		return exitUsage
+	}
+	if err != nil {
+		return fail(stderr, err)
+	}
+	fmt.Fprintf(stdout, "registered: %s\n", key)
 	return exitOK
 }

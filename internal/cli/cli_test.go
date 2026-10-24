@@ -186,3 +186,22 @@ func TestEnableNoNames(t *testing.T) {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 }
+
+func TestRegisterCommand(t *testing.T) {
+	dir := sandbox(t)
+	out := mustRun(t, "register", "alias://gs", "--desc", "git status", "--tags", "git, vcs,")
+	if out != "registered: alias://gs\n" {
+		t.Fatalf("stdout = %q", out)
+	}
+	reg, _ := registry.Store{Dir: dir}.Load()
+	if e := reg.Tools["alias://gs"]; e == nil || strings.Join(e.Tags, " ") != "git vcs" {
+		t.Fatalf("entry = %+v", e)
+	}
+}
+
+func TestRegisterBadID(t *testing.T) {
+	sandbox(t)
+	if code, _, _ := run(t, "register", "gs"); code != 2 {
+		t.Fatalf("code = %d, want 2", code)
+	}
+}

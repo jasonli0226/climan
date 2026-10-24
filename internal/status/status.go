@@ -72,22 +72,28 @@ func Set(ctx context.Context, o Options, names []string, to registry.Status, des
 	return probeAndStore(ctx, o, toProbe)
 }
 
-// cleanDesc trims desc and removes control characters; a newline is an error.
+// cleanDesc applies CleanDesc to an optional desc.
 func cleanDesc(desc *string) (*string, error) {
 	if desc == nil {
 		return nil, nil
 	}
-	if strings.ContainsAny(*desc, "\r\n") {
-		return nil, errors.New("--desc must be a single line")
+	s, err := CleanDesc(*desc)
+	return &s, err
+}
+
+// CleanDesc trims a user description, turns control characters into spaces
+// and collapses whitespace; a newline is an error.
+func CleanDesc(desc string) (string, error) {
+	if strings.ContainsAny(desc, "\r\n") {
+		return "", errors.New("--desc must be a single line")
 	}
 	s := strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
 			return ' '
 		}
 		return r
-	}, *desc)
-	s = strings.Join(strings.Fields(s), " ")
-	return &s, nil
+	}, desc)
+	return strings.Join(strings.Fields(s), " "), nil
 }
 
 // resolve maps names to registry keys, adopting tools from a scan when a

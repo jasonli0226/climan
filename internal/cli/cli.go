@@ -32,6 +32,7 @@ commands:
   list [--all | --pending | --ignored | --stale] show tools (enabled by default)
   enable <tool>... [--desc "text"]               use tools; --desc sets your description
   ignore <tool>...                               stop offering tools
+  register <id> [--desc "text"] [--tags a,b]     add file://, alias:// or mcp:// by hand
   context                                        print the tool list for agents
 `
 )
@@ -55,6 +56,8 @@ func Run(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 		return runStatus("enable", registry.Enabled, args[1:], stdout, stderr)
 	case "ignore":
 		return runStatus("ignore", registry.Ignored, args[1:], stdout, stderr)
+	case "register":
+		return runRegister(args[1:], stdout, stderr)
 	case "context":
 		return runContext(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
