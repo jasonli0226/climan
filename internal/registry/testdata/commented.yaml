@@ -1,0 +1,15 @@
+# climan registry — hand-edited
+version: 1
+last_sync: 2026-10-20T10:00:00Z
+tools:
+  # ripgrep, my main search tool
+  rg:
+    status: enabled
+    source: discovered
+    path: /home/u/.cargo/bin/rg
+    homepage: https://github.com/BurntSushi/ripgrep
+    notes: "use -uu for hidden files" # keep this
+  aws:
+    status: pending
+    source: discovered
+    path: /home/u/.local/bin/aws
