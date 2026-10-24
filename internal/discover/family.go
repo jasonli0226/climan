@@ -27,18 +27,20 @@ var (
 func Group(found []Found) []Tool {
 	var tools []Tool
 	var plain, config []Found
+	taken := map[string]bool{} // names of core tools; no family key may reuse one
 	for _, f := range found {
 		switch {
 		case f.Tag != TagInstalled:
 			tools = append(tools, single(f))
+			taken[f.Name] = true
 		case strings.HasSuffix(f.Name, configSuffix) && f.Name != configSuffix:
 			config = append(config, f)
 		default:
 			plain = append(plain, f)
 		}
 	}
-	tools = append(tools, families(plain, "")...)
-	tools = append(tools, families(config, configSuffix)...)
+	tools = append(tools, families(plain, "", taken)...)
+	tools = append(tools, families(config, configSuffix, taken)...)
 	sort.Slice(tools, func(i, j int) bool { return tools[i].Key < tools[j].Key })
 	return tools
 }
@@ -63,8 +65,9 @@ func parseVersion(name string) parsed {
 }
 
 // families groups installed commands whose names (with suffix removed)
-// share an anchored base, then re-appends suffix to each key.
-func families(found []Found, suffix string) []Tool {
+// share an anchored base, then re-appends suffix to each key. A base whose
+// key is in taken does not form a family.
+func families(found []Found, suffix string, taken map[string]bool) []Tool {
 	stem := func(f Found) string { return strings.TrimSuffix(f.Name, suffix) }
 	exists := map[string]bool{}
 	parse := map[string]parsed{}
@@ -73,6 +76,11 @@ func families(found []Found, suffix string) []Tool {
 		parse[stem(f)] = parseVersion(stem(f))
 	}
 	anchored := anchors(exists, parse)
+	for base := range anchored {
+		if taken[base+suffix] {
+			delete(anchored, base)
+		}
+	}
 
 	byKey := map[string][]Found{}
 	for _, f := range found {

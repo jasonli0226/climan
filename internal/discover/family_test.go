@@ -96,3 +96,21 @@ func TestGroupNoise(t *testing.T) {
 		t.Fatal("activate without a pyenv shim is noise, want not noise")
 	}
 }
+
+func TestGroupFamilyKeyClashesWithCore(t *testing.T) {
+	sys := Found{Name: "pip", Path: "/usr/bin/pip", Dir: "/usr/bin", Tag: TagCore}
+	tools := Group(append(installed("pip3", "pip3.12"), sys))
+	keys := map[string]int{}
+	for _, tl := range tools {
+		keys[tl.Key]++
+	}
+	want := map[string]int{"pip": 1, "pip3": 1, "pip3.12": 1}
+	if !reflect.DeepEqual(keys, want) {
+		t.Fatalf("keys = %v, want %v (no family may reuse a core tool's name)", keys, want)
+	}
+	for _, tl := range tools {
+		if tl.Key == "pip" && tl.Tag != TagCore {
+			t.Fatalf("pip = %+v, want the core tool", tl)
+		}
+	}
+}
