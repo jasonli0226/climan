@@ -22,6 +22,7 @@ const (
 	waitDelay = 500 * time.Millisecond
 	outputCap = 64 << 10
 	lineCap   = 200
+	helpLines = 80
 )
 
 // Info is what a probe learned about a tool.
@@ -35,15 +36,27 @@ func Probe(ctx context.Context, env platform.Env, path string) Info {
 		return Info{}
 	}
 	summary, _ := run(ctx, env, path, "--help")
-	return Info{Version: version, Summary: summary}
+	return Info{Version: firstLine(version), Summary: firstLine(summary)}
 }
 
-// run executes path with one argument and returns its first line. The exit
-// status is ignored: many tools exit non-zero after printing help.
-func run(ctx context.Context, env platform.Env, path, arg string) (line string, timedOut bool) {
+// Help returns `path --help` output for a skill file, cleaned to plain text:
+// escape sequences removed, tabs expanded, other control characters dropped,
+// lines capped at lineCap runes and the whole at helpLines lines.
+func Help(ctx context.Context, env platform.Env, path string) string {
+	out, timedOut := run(ctx, env, path, "--help")
+	if timedOut {
+		return ""
+	}
+	return cleanHelp(out)
+}
+
+// run executes path with one argument and returns its output, capped at
+// outputCap. The exit status is ignored: many tools exit non-zero after
+// printing help.
+func run(ctx context.Context, env platform.Env, path, arg string) (out []byte, timedOut bool) {
 	dir, err := os.MkdirTemp("", "climan-probe-")
 	if err != nil {
-		return "", false
+		return nil, false
 	}
 	defer os.RemoveAll(dir)
 
@@ -53,16 +66,16 @@ func run(ctx context.Context, env platform.Env, path, arg string) (line string, 
 	cmd.Dir = dir
 	cmd.Env = probeEnv(env)
 	cmd.Stdin = nil // the null device
-	out := &capped{}
-	cmd.Stdout, cmd.Stderr = out, out
+	buf := &capped{}
+	cmd.Stdout, cmd.Stderr = buf, buf
 	cmd.WaitDelay = waitDelay
 	cmd.SysProcAttr = sysProcAttr()
 
 	_ = cmd.Run()
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return "", true
+		return nil, true
 	}
-	return firstLine(out.buf.Bytes()), false
+	return buf.buf.Bytes(), false
 }
 
 // probeEnv is the minimal environment a probed tool sees.
@@ -103,6 +116,36 @@ func firstLine(out []byte) string {
 		return line
 	}
 	return ""
+}
+
+// cleanHelp turns raw help output into at most helpLines plain lines.
+func cleanHelp(out []byte) string {
+	text := ansiEscape.ReplaceAllString(string(out), "")
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	var lines []string
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.ReplaceAll(line, "\t", "    ")
+		line = strings.Map(func(r rune) rune {
+			if unicode.IsControl(r) {
+				return -1
+			}
+			return r
+		}, line)
+		if r := []rune(line); len(r) > lineCap {
+			line = string(r[:lineCap])
+		}
+		lines = append(lines, strings.TrimRight(line, " "))
+	}
+	for len(lines) > 0 && lines[0] == "" {
+		lines = lines[1:]
+	}
+	if len(lines) > helpLines {
+		lines = lines[:helpLines]
+	}
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return strings.Join(lines, "\n")
 }
 
 // capped keeps the first outputCap bytes and silently drops the rest.
