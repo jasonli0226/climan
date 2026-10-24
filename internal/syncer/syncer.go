@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/jasonli0226/climan/internal/discover"
@@ -14,6 +15,9 @@ import (
 	"github.com/jasonli0226/climan/internal/reconcile"
 	"github.com/jasonli0226/climan/internal/registry"
 )
+
+// maxParallelProbes bounds how many probed tools run at once.
+const maxParallelProbes = 8
 
 // Options wires Run to its environment.
 type Options struct {
@@ -108,14 +112,27 @@ func probeAll(ctx context.Context, o Options, keys []string) error {
 	if err != nil {
 		return err
 	}
-	infos := map[string]probe.Info{}
-	for _, k := range keys {
-		if e := reg.Tools[k]; e != nil && e.Path != "" {
-			infos[k] = o.Probe(ctx, o.Env, e.Path)
+	fmt.Fprintf(o.Out, "probing %d new %s for version and help...\n", len(keys), plural(len(keys), "tool"))
+	infos := make([]probe.Info, len(keys))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxParallelProbes)
+	for i, k := range keys {
+		e := reg.Tools[k]
+		if e == nil || e.Path == "" {
+			continue
 		}
+		wg.Add(1)
+		go func(i int, path string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			infos[i] = o.Probe(ctx, o.Env, path)
+		}(i, e.Path)
 	}
+	wg.Wait()
 	return o.Store.Update(func(reg *registry.Registry) error {
-		for k, info := range infos {
+		for i, k := range keys {
+			info := infos[i]
 			if e := reg.Tools[k]; e != nil && e.Status == registry.Enabled {
 				e.Version, e.Summary = info.Version, info.Summary
 			}
@@ -135,4 +152,11 @@ func printSummary(w io.Writer, newKeys []string, decisions map[string]Decision, 
 	}
 	fmt.Fprintf(w, "sync: new: %d, enabled: %d, ignored: %d, pending: %d, stale: %d\n",
 		len(newKeys), count[registry.Enabled], count[registry.Ignored], count[registry.Pending], stale)
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
 }

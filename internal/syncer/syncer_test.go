@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,7 +25,9 @@ type fixture struct {
 	bin    string
 	core   string
 	store  registry.Store
+	mu     sync.Mutex
 	probed []string
+	delay  time.Duration
 	out    bytes.Buffer
 }
 
@@ -66,6 +69,9 @@ func (f *fixture) run(c Chooser) error {
 		Env: f.env(), Store: f.store, Chooser: c,
 		Now: func() time.Time { return time.Date(2026, 10, 25, 9, 0, 0, 0, time.UTC) },
 		Probe: func(_ context.Context, _ platform.Env, path string) probe.Info {
+			time.Sleep(f.delay)
+			f.mu.Lock()
+			defer f.mu.Unlock()
 			f.probed = append(f.probed, filepath.Base(path))
 			return probe.Info{Version: "v-" + filepath.Base(path), Summary: "does things"}
 		},
@@ -230,5 +236,37 @@ func TestRunSummary(t *testing.T) {
 	}
 	if want := "new: 2, enabled: 1, ignored: 1, pending: 0, stale: 0"; !strings.Contains(f.out.String(), want) {
 		t.Fatalf("output %q lacks %q", f.out.String(), want)
+	}
+}
+
+func TestRunReportsProbing(t *testing.T) {
+	f := newFixture(t, "a")
+	if err := f.run(&fakeChooser{decisions: map[string]Decision{"a": {Status: registry.Enabled}}}); err != nil {
+		t.Fatal(err)
+	}
+	out := f.out.String()
+	p, s := strings.Index(out, "probing 1 new tool"), strings.Index(out, "sync:")
+	if p < 0 || p > s {
+		t.Fatalf("output %q: want a probing line before the summary", out)
+	}
+}
+
+func TestRunProbesInParallel(t *testing.T) {
+	keys := []string{"a", "b", "c", "d"}
+	f := newFixture(t, keys...)
+	f.delay = 300 * time.Millisecond
+	d := map[string]Decision{}
+	for _, k := range keys {
+		d[k] = Decision{Status: registry.Enabled}
+	}
+	start := time.Now()
+	if err := f.run(&fakeChooser{decisions: d}); err != nil {
+		t.Fatal(err)
+	}
+	if took := time.Since(start); took > 900*time.Millisecond {
+		t.Fatalf("4 probes of 300ms took %v, want them run in parallel", took)
+	}
+	if len(f.probed) != 4 {
+		t.Fatalf("probed %v, want 4", f.probed)
 	}
 }
