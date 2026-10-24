@@ -136,3 +136,19 @@ func TestMarshalFlowToolsBecomesBlock(t *testing.T) {
 		t.Fatalf("want block-style tools mapping:\n%s", out)
 	}
 }
+
+func TestParseRejectsBadEntries(t *testing.T) {
+	tests := []struct{ name, data, want string }{
+		{"empty entry", "tools:\n  rg:\n", `tool "rg"`},
+		{"bad status", "tools:\n  rg:\n    status: enabeld\n    source: discovered\n", "enabeld"},
+		{"bad source", "tools:\n  rg:\n    status: enabled\n    source: manual\n", "manual"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse("/cfg/registry.yaml", []byte(tt.data))
+			if err == nil || !strings.Contains(err.Error(), tt.want) || !strings.Contains(err.Error(), "/cfg/registry.yaml") {
+				t.Fatalf("err = %v, want mention of %q and the file", err, tt.want)
+			}
+		})
+	}
+}

@@ -39,6 +39,11 @@ func Parse(name string, data []byte) (*Registry, error) {
 	if f.Tools == nil {
 		f.Tools = map[string]*Entry{}
 	}
+	for key, e := range f.Tools {
+		if err := validEntry(e); err != nil {
+			return nil, fmt.Errorf("%s: tool %q: %w", name, key, err)
+		}
+	}
 	return &Registry{Version: f.Version, LastSync: f.LastSync, Tools: f.Tools, doc: &doc}, nil
 }
 
@@ -197,4 +202,22 @@ func mappingValue(m *yaml.Node, key string) *yaml.Node {
 
 func scalarKey(s string) *yaml.Node {
 	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: s}
+}
+
+// validEntry rejects hand edits that would otherwise misbehave silently.
+func validEntry(e *Entry) error {
+	if e == nil {
+		return fmt.Errorf("entry is empty; give it at least status and source")
+	}
+	switch e.Status {
+	case Pending, Enabled, Ignored:
+	default:
+		return fmt.Errorf("status %q must be %s, %s or %s", e.Status, Pending, Enabled, Ignored)
+	}
+	switch e.Source {
+	case Discovered, Registered:
+	default:
+		return fmt.Errorf("source %q must be %s or %s", e.Source, Discovered, Registered)
+	}
+	return nil
 }
