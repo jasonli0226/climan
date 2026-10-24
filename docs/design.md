@@ -52,10 +52,12 @@ Rules below were checked against a real Linux PATH (see
 - **Tags by location** (first match wins):
   - `core`: `/usr/bin`, `/bin`, `/usr/sbin`, `/sbin`, `/usr/games`, and the
     Windows dirs in [Platforms](#platforms). Core tools are scanned but
-    hidden from the sync prompt and from the default `list`. They appear only
-    with `list --all` or after being enabled by hand.
-  - `installed`: any dir under the user's home, plus `/usr/local/*`, `/opt/*`,
-    and `/snap/bin`. Shown in the sync prompt. A fixed list of package-manager
+    hidden from the sync prompt and from the default `list`. They are not
+    written to the registry unless enabled by hand, which keeps the file
+    human-sized; `list --all` rescans to show them.
+  - `installed`: every other dir, such as anything under the user's home,
+    `/usr/local/*`, `/opt/*`, `/snap/bin`, and on Windows `C:\Program Files\...`.
+    Shown in the sync prompt. A fixed list of package-manager
     dirs is not enough: real PATHs contain per-tool dirs such as
     `~/.opencode/bin` and versioned ones such as
     `~/.nvm/versions/node/<v>/bin`.
@@ -196,9 +198,9 @@ Docker is needed. Windows behavior is tested on a GitHub Actions
 | PATH split       | `filepath.SplitList` (`:`)          | `filepath.SplitList` (`;`)                      |
 | Executable test  | regular file with any exec bit      | extension listed in `PATHEXT`                   |
 | Config dir       | `os.UserConfigDir()` → `~/.config/climan` | `os.UserConfigDir()` → `%APPDATA%\climan` |
-| `core` dirs      | `/usr/bin`, `/bin`, `/usr/sbin`, `/sbin`, `/usr/local/sbin` | `%SystemRoot%\System32`, `%SystemRoot%` |
+| `core` dirs      | `/usr/bin`, `/bin`, `/usr/sbin`, `/sbin`, `/usr/games` | `%SystemRoot%\System32`, `%SystemRoot%` |
 | Interest dirs    | see [Filtering](#4-filtering-keeps-the-list-human-sized) | `%USERPROFILE%\go\bin`, `%USERPROFILE%\.cargo\bin`, `%USERPROFILE%\.local\bin`, `%APPDATA%\npm`, `%USERPROFILE%\scoop\shims`, `%LOCALAPPDATA%\Microsoft\WinGet\Links`, `%ProgramData%\chocolatey\bin` |
-| Shims            | symlinks; script shims (see open questions) | scoop: read `path =` from the sibling `.shim` file; npm: `.cmd` wrappers |
+| Shims            | script shims (see [Filtering](#4-filtering-keeps-the-list-human-sized)) | scoop: read `path =` from the sibling `.shim` file; npm: `.cmd` wrappers |
 | `alias://`       | shell aliases                       | deferred past v1 (PowerShell aliases/functions) |
 
 On Windows, a file name and its extension form one command (`rg.exe` → `rg`).

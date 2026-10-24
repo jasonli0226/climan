@@ -1,3 +1,8 @@
 # Private planning notes
 NOTES.md
 docs/.README.orig.md
+
+# Local downloads and scratch
+*.tar.gz
+.superpowers/
+docs/superpowers/
