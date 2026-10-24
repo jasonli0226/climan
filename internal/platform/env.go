@@ -14,9 +14,9 @@ const ConfigDirVar = "CLIMAN_CONFIG_DIR"
 
 // Env is a snapshot of the parts of the environment climan depends on.
 type Env struct {
-	GOOS    string            // "linux" or "windows"
-	Path    string            // raw PATH value
-	PathExt []string          // lower-case, e.g. [".com", ".exe"]; nil on linux
+	GOOS    string   // "linux" or "windows"
+	Path    string   // raw PATH value
+	PathExt []string // lower-case, e.g. [".com", ".exe"]; nil on linux
 	Home    string
 	Vars    map[string]string // the full environment
 }

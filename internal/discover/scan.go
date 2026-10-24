@@ -22,9 +22,9 @@ const (
 
 // Found is one command on PATH.
 type Found struct {
-	Name     string   // command name; lower-cased and extension-free on windows
-	Path     string   // winning path
-	Dir      string   // dir of Path, as listed on PATH (cleaned)
+	Name     string // command name; lower-cased and extension-free on windows
+	Path     string // winning path
+	Dir      string // dir of Path, as listed on PATH (cleaned)
 	Tag      Tag
 	Shim     string   // shim kind; "" for plain binaries
 	Shadowed []string // later paths with the same name, in PATH order
@@ -58,7 +58,10 @@ func Scan(env platform.Env) []Found {
 				f.Shadowed = append(f.Shadowed, path)
 				continue
 			}
-			byName[name] = &Found{Name: name, Path: path, Dir: dir, Tag: tagFor(env, dir)}
+			byName[name] = &Found{
+				Name: name, Path: path, Dir: dir,
+				Tag: tagFor(env, dir), Shim: DetectShim(env, path),
+			}
 		}
 	}
 
