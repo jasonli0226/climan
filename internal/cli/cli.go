@@ -34,6 +34,7 @@ commands:
   ignore <tool>...                               stop offering tools
   register <id> [--desc "text"] [--tags a,b]     add file://, alias:// or mcp:// by hand
   describe <tool> [--probe]                      show everything known about a tool
+  skill <tool> | --all [--out dir]               write SKILL.md files for agents
   context                                        print the tool list for agents
 `
 )
@@ -61,6 +62,8 @@ func Run(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 		return runRegister(args[1:], stdout, stderr)
 	case "describe":
 		return runDescribe(args[1:], stdout, stderr)
+	case "skill":
+		return runSkill(args[1:], stdout, stderr)
 	case "context":
 		return runContext(args[1:], stdout, stderr)
 	case "help", "-h", "--help":

@@ -230,3 +230,59 @@ func TestDescribeNeedsOneName(t *testing.T) {
 		}
 	}
 }
+
+func TestSkillCommand(t *testing.T) {
+	sandbox(t)
+	out := t.TempDir()
+	mustRun(t, "enable", "mytool")
+	mustRun(t, "skill", "mytool", "--out", out)
+	if _, err := os.Stat(filepath.Join(out, "cli", "mytool", "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSkillAll(t *testing.T) {
+	sandbox(t)
+	out := t.TempDir()
+	mustRun(t, "enable", "mytool")
+	mustRun(t, "register", "alias://gs", "--desc", "git status")
+	mustRun(t, "register", "mcp://github")
+	mustRun(t, "ignore", "mcp://github")
+	mustRun(t, "skill", "--all", "--out", out)
+	for _, p := range []string{"cli/mytool/SKILL.md", "cli/alias-gs/SKILL.md"} {
+		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
+			t.Error(err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(out, "cli", "mcp-github")); err == nil {
+		t.Error("ignored tool got a skill")
+	}
+}
+
+func TestSkillNoOutDir(t *testing.T) {
+	sandbox(t)
+	mustRun(t, "enable", "mytool")
+	code, _, stderr := run(t, "skill", "mytool")
+	if code != 1 || !strings.Contains(stderr, "--out") || !strings.Contains(stderr, "config.yaml") {
+		t.Fatalf("code=%d stderr=%q", code, stderr)
+	}
+}
+
+func TestSkillUsage(t *testing.T) {
+	sandbox(t)
+	for _, args := range [][]string{{"skill"}, {"skill", "a", "--all"}} {
+		if code, _, _ := run(t, args...); code != 2 {
+			t.Errorf("%v: code = %d, want 2", args, code)
+		}
+	}
+}
+
+func TestSkillUnknown(t *testing.T) {
+	sandbox(t)
+	out := t.TempDir()
+	code, _, stderr := run(t, "skill", "nope", "--out", out)
+	entries, _ := os.ReadDir(out)
+	if code != 1 || !strings.Contains(stderr, "unknown tool: nope") || len(entries) != 0 {
+		t.Fatalf("code=%d stderr=%q entries=%d", code, stderr, len(entries))
+	}
+}
