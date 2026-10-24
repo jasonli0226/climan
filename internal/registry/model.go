@@ -40,6 +40,7 @@ type Entry struct {
 	LastSeen time.Time `yaml:"last_seen,omitempty"`
 	Version  string    `yaml:"version,omitempty"`
 	Summary  string    `yaml:"summary,omitempty"`
+	Desc     string    `yaml:"desc,omitempty"` // written by the user only
 	Tags     []string  `yaml:"tags,omitempty"`
 	Notes    string    `yaml:"notes,omitempty"`
 }

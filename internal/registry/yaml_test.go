@@ -152,3 +152,19 @@ func TestParseRejectsBadEntries(t *testing.T) {
 		})
 	}
 }
+
+func TestDescRoundTrip(t *testing.T) {
+	reg := New()
+	reg.Tools["zoxide"] = &Entry{Status: Enabled, Source: Discovered, Desc: "jump to frequent dirs"}
+	out, err := reg.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), "desc: jump to frequent dirs") {
+		t.Fatalf("no desc in output:\n%s", out)
+	}
+	back, err := Parse("r.yaml", out)
+	if err != nil || back.Tools["zoxide"].Desc != "jump to frequent dirs" {
+		t.Fatalf("round trip = %+v, %v", back.Tools["zoxide"], err)
+	}
+}
