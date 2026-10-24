@@ -56,6 +56,15 @@ func Reconcile(reg *registry.Registry, tools []discover.Tool, now time.Time) Res
 	return res
 }
 
+// Adopt creates the pending discovered entry sync would create for t, stores
+// it under t.Key and returns it.
+func Adopt(reg *registry.Registry, t discover.Tool, now time.Time) *registry.Entry {
+	e := &registry.Entry{Status: registry.Pending, Source: registry.Discovered}
+	observe(e, t, now)
+	reg.Tools[t.Key] = e
+	return e
+}
+
 // observe records what the scan saw. Status and curated or probed fields
 // (Version, Summary, Tags, Notes) are left alone.
 func observe(e *registry.Entry, t discover.Tool, now time.Time) {

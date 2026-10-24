@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/jasonli0226/climan/internal/discover"
@@ -16,16 +15,13 @@ import (
 	"github.com/jasonli0226/climan/internal/registry"
 )
 
-// maxParallelProbes bounds how many probed tools run at once.
-const maxParallelProbes = 8
-
 // Options wires Run to its environment.
 type Options struct {
 	Env     platform.Env
 	Store   registry.Store
 	Chooser Chooser
 	Now     func() time.Time
-	Probe   func(ctx context.Context, env platform.Env, path string) probe.Info
+	Probe   probe.Func
 	Out     io.Writer
 }
 
@@ -119,27 +115,15 @@ func probeAll(ctx context.Context, o Options, keys []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(o.Out, "probing %d new %s for version and help...\n", len(keys), plural(len(keys), "tool"))
-	infos := make([]probe.Info, len(keys))
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, maxParallelProbes)
-	for i, k := range keys {
-		e := reg.Tools[k]
-		if e == nil || e.Path == "" {
-			continue
+	paths := map[string]string{}
+	for _, k := range keys {
+		if e := reg.Tools[k]; e != nil && e.Path != "" {
+			paths[k] = e.Path
 		}
-		wg.Add(1)
-		go func(i int, path string) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			infos[i] = o.Probe(ctx, o.Env, path)
-		}(i, e.Path)
 	}
-	wg.Wait()
+	infos := probe.All(ctx, o.Env, paths, o.Probe, o.Out)
 	return o.Store.Update(func(reg *registry.Registry) error {
-		for i, k := range keys {
-			info := infos[i]
+		for k, info := range infos {
 			if e := reg.Tools[k]; e != nil && e.Status == registry.Enabled {
 				e.Version, e.Summary = info.Version, info.Summary
 			}
@@ -159,13 +143,6 @@ func printSummary(w io.Writer, newKeys []string, decisions map[string]Decision, 
 	}
 	fmt.Fprintf(w, "sync: new: %d, enabled: %d, ignored: %d, pending: %d, stale: %d\n",
 		len(newKeys), count[registry.Enabled], count[registry.Ignored], count[registry.Pending], stale)
-}
-
-func plural(n int, word string) string {
-	if n == 1 {
-		return word
-	}
-	return word + "s"
 }
 
 // newKeys is every tool that was new this run: those offered to the chooser

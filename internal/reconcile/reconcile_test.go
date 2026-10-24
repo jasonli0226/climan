@@ -166,3 +166,15 @@ func TestNeverDeletes(t *testing.T) {
 		t.Fatalf("tools = %d, want 2", len(reg.Tools))
 	}
 }
+
+func TestAdopt(t *testing.T) {
+	reg := registry.New()
+	e := Adopt(reg, tool("git", discover.TagCore), t0)
+	want := &registry.Entry{
+		Status: registry.Pending, Source: registry.Discovered, Tag: "core",
+		Path: "/h/bin/git", Members: []string{"git"}, LastSeen: t0,
+	}
+	if !reflect.DeepEqual(e, want) || reg.Tools["git"] != e {
+		t.Fatalf("Adopt = %+v, stored %+v; want %+v", e, reg.Tools["git"], want)
+	}
+}
