@@ -30,7 +30,7 @@ come back when you reinstall it.
 ## Install (planned)
 
 ```sh
-go install github.com/jc-home-sweet-home/climan@latest
+go install github.com/jasonli0226/climan@latest
 ```
 
 ## Quickstart (planned)
