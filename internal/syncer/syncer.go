@@ -59,7 +59,7 @@ func Run(ctx context.Context, o Options) error {
 	var toProbe []string
 	err = o.Store.Update(func(reg *registry.Registry) error {
 		res = reconcile.Reconcile(reg, tools, now)
-		toProbe = apply(reg, res.New, decisions)
+		toProbe = apply(reg, decisions)
 		return nil
 	})
 	if err != nil {
@@ -68,7 +68,7 @@ func Run(ctx context.Context, o Options) error {
 	if err := probeAll(ctx, o, toProbe); err != nil {
 		return err
 	}
-	printSummary(o.Out, res.New, decisions, len(res.Stale))
+	printSummary(o.Out, newKeys(cands, res.New), decisions, len(res.Stale))
 	return nil
 }
 
@@ -81,16 +81,23 @@ func candidates(keys []string, byKey map[string]discover.Tool, reg *registry.Reg
 	return out
 }
 
-// apply sets each new tool's status and returns the keys of newly enabled
-// installed tools, which are the ones to probe.
-func apply(reg *registry.Registry, newKeys []string, decisions map[string]Decision) []string {
+// apply sets the status of each decided tool that is still pending, so a
+// decision survives another sync adding the tool meanwhile, but never
+// overrides a status set in the meantime. It returns the keys of newly
+// enabled installed tools, which are the ones to probe.
+func apply(reg *registry.Registry, decisions map[string]Decision) []string {
+	keys := make([]string, 0, len(decisions))
+	for k := range decisions {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
 	var enabled []string
-	for _, k := range newKeys {
-		d, ok := decisions[k]
-		if !ok || d.Status == "" {
-			d.Status = registry.Pending
-		}
+	for _, k := range keys {
+		d := decisions[k]
 		e := reg.Tools[k]
+		if e == nil || e.Source != registry.Discovered || e.Status != registry.Pending || d.Status == "" {
+			continue
+		}
 		e.Status = d.Status
 		for _, tag := range d.Tags {
 			if !slices.Contains(e.Tags, tag) {
@@ -159,4 +166,19 @@ func plural(n int, word string) string {
 		return word
 	}
 	return word + "s"
+}
+
+// newKeys is every tool that was new this run: those offered to the chooser
+// plus any found after the prompt opened.
+func newKeys(cands []Candidate, added []string) []string {
+	keys := make([]string, 0, len(cands)+len(added))
+	for _, c := range cands {
+		keys = append(keys, c.Key)
+	}
+	for _, k := range added {
+		if !slices.Contains(keys, k) {
+			keys = append(keys, k)
+		}
+	}
+	return keys
 }

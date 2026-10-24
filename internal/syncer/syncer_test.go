@@ -270,3 +270,42 @@ func TestRunProbesInParallel(t *testing.T) {
 		t.Fatalf("probed %v, want 4", f.probed)
 	}
 }
+
+func TestRunKeepsDecisionWhenToolAddedMeanwhile(t *testing.T) {
+	f := newFixture(t, "a")
+	c := &fakeChooser{decisions: map[string]Decision{"a": {Status: registry.Enabled}}}
+	c.during = func() {
+		// a cron `sync --batch` lands while the picker is open
+		if err := f.run(BatchChooser{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := f.run(c); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.entry("a").Status; got != registry.Enabled {
+		t.Fatalf("a = %q, want enabled (decision kept)", got)
+	}
+	if !strings.Contains(f.out.String(), "new: 1, enabled: 1") {
+		t.Fatalf("summary %q, want new: 1, enabled: 1", f.out.String())
+	}
+}
+
+func TestRunDecisionDoesNotOverrideEditMeanwhile(t *testing.T) {
+	f := newFixture(t, "a")
+	c := &fakeChooser{decisions: map[string]Decision{"a": {Status: registry.Enabled}}}
+	c.during = func() {
+		if err := f.store.Update(func(r *registry.Registry) error {
+			r.Tools["a"] = &registry.Entry{Status: registry.Ignored, Source: registry.Discovered}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := f.run(c); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.entry("a").Status; got != registry.Ignored {
+		t.Fatalf("a = %q, want ignored (status set meanwhile wins)", got)
+	}
+}
