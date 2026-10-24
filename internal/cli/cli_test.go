@@ -99,3 +99,90 @@ func TestNoCommand(t *testing.T) {
 		t.Fatalf("code=%d stderr=%q, want 2 with usage", code, stderr)
 	}
 }
+
+func mustRun(t *testing.T, args ...string) string {
+	t.Helper()
+	code, stdout, stderr := run(t, args...)
+	if code != 0 {
+		t.Fatalf("%v: code=%d stderr=%q", args, code, stderr)
+	}
+	return stdout
+}
+
+func TestContextCommand(t *testing.T) {
+	sandbox(t)
+	mustRun(t, "sync", "--batch")
+	mustRun(t, "enable", "mytool", "--desc", "does x")
+	if out := mustRun(t, "context"); !strings.HasSuffix(out, "mytool: does x\n") {
+		t.Fatalf("context = %q", out)
+	}
+}
+
+func TestContextNoRegistry(t *testing.T) {
+	sandbox(t)
+	if out := mustRun(t, "context"); !strings.Contains(out, "No tools enabled yet") {
+		t.Fatalf("context = %q", out)
+	}
+}
+
+func TestListNoRegistry(t *testing.T) {
+	sandbox(t)
+	if out := mustRun(t, "list"); out != "" {
+		t.Fatalf("list = %q, want empty", out)
+	}
+}
+
+func TestListCommand(t *testing.T) {
+	sandbox(t)
+	mustRun(t, "sync", "--batch")
+	if out := mustRun(t, "list", "--pending"); !strings.HasPrefix(out, "mytool") {
+		t.Fatalf("list --pending = %q", out)
+	}
+}
+
+func TestListFlagsExclusive(t *testing.T) {
+	sandbox(t)
+	code, _, stderr := run(t, "list", "--all", "--stale")
+	if code != 2 || !strings.Contains(stderr, "--all") || !strings.Contains(stderr, "--stale") {
+		t.Fatalf("code=%d stderr=%q", code, stderr)
+	}
+}
+
+func TestEnableFlagAfterName(t *testing.T) {
+	dir := sandbox(t)
+	mustRun(t, "enable", "mytool", "--desc", "x")
+	reg, err := registry.Store{Dir: dir}.Load()
+	if err != nil || reg.Tools["mytool"].Desc != "x" {
+		t.Fatalf("mytool = %+v, %v", reg.Tools["mytool"], err)
+	}
+}
+
+func TestDescNeedsOneName(t *testing.T) {
+	sandbox(t)
+	if code, _, _ := run(t, "enable", "a", "b", "--desc", "x"); code != 2 {
+		t.Fatalf("code = %d, want 2", code)
+	}
+}
+
+func TestIgnoreRejectsDesc(t *testing.T) {
+	sandbox(t)
+	if code, _, _ := run(t, "ignore", "mytool", "--desc", "x"); code != 2 {
+		t.Fatalf("code = %d, want 2", code)
+	}
+}
+
+func TestEnableUnknown(t *testing.T) {
+	sandbox(t)
+	code, _, stderr := run(t, "enable", "nope")
+	if code != 1 || !strings.Contains(stderr, "unknown tool: nope") {
+		t.Fatalf("code=%d stderr=%q", code, stderr)
+	}
+}
+
+func TestEnableNoNames(t *testing.T) {
+	sandbox(t)
+	code, _, stderr := run(t, "enable")
+	if code != 2 || !strings.Contains(stderr, "usage: climan") {
+		t.Fatalf("code=%d stderr=%q", code, stderr)
+	}
+}

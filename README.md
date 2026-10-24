@@ -3,9 +3,9 @@
 A catalog of the CLI tools installed on your machine, and of how your AI agents
 should use them.
 
-> **Status:** design stage. Nothing is implemented yet. The commands below
-> describe the planned v1. See [docs/design.md](docs/design.md) for the full
-> design.
+> **Status:** early. `sync`, `list`, `enable`, `ignore` and `context` work on
+> Linux and Windows. `register`, `describe` and `skill` are planned. See
+> [docs/design.md](docs/design.md) for the full design.
 
 ## Why
 
@@ -27,34 +27,49 @@ files.
 Sync never deletes entries. If you uninstall a tool, its notes are kept and
 come back when you reinstall it.
 
-## Install (planned)
+## Install
 
 ```sh
 go install github.com/jasonli0226/climan@latest
 ```
 
-## Quickstart (planned)
+## Quickstart
 
 ```sh
 climan sync                       # scan and pick tools to keep
-climan list                       # show kept tools
+climan list                       # show kept tools; ? marks weak descriptions
+climan enable zoxide --desc "jump to frequent dirs"   # fix a description
+climan list --pending             # tools you have not decided on yet
+climan context                    # the tool list agents read
+```
+
+Planned:
+
+```sh
 climan describe rg                # full metadata for one tool
 climan register alias://gs --desc "git status"
-climan context                    # inventory block for an agent prompt
 climan skill rg --out ~/agent-skills
 ```
+
+## Using with agents
+
+[`skills/climan/SKILL.md`](skills/climan/SKILL.md) teaches an agent to run
+`climan context` at the start of every task and to use an installed tool
+before writing its own script. Copy it into your agent's skills directory.
+`context` lists enabled tools only, one line each, so it stays short enough to
+read on every task.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `sync [--batch \| --auto]` | Scan and pick new tools. `--batch` runs without prompts (for cron); `--auto` applies `rules.yaml`. |
-| `register <id>` | Add an entry by hand: a script (`file://...`), alias (`alias://...`), or MCP server (`mcp://...`). |
-| `enable <tool>` / `ignore <tool>` | Keep a tool, or stop being asked about it. |
+| `enable <tool>... [--desc "text"]` / `ignore <tool>...` | Keep tools, or stop being asked about them. `--desc` sets your own description, which agents see instead of the probed one. |
+| `register <id>` (planned) | Add an entry by hand: a script (`file://...`), alias (`alias://...`), or MCP server (`mcp://...`). |
 | `list [--all \| --pending \| --ignored \| --stale]` | Show kept tools, or other groups. |
-| `describe <tool>` | Show everything known about a tool. |
-| `skill <tool> \| --all` | Write `SKILL.md` files for agents. |
-| `context` | Print a short tool list to paste into an agent prompt. |
+| `context` | Print the short tool list agents read on every task. |
+| `describe <tool>` (planned) | Show everything known about a tool. |
+| `skill <tool> \| --all` (planned) | Write `SKILL.md` files for agents. |
 
 ## Registry example
 

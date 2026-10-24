@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"time"
 
 	"golang.org/x/term"
 
@@ -29,7 +28,11 @@ const (
 	usage = `usage: climan <command> [flags]
 
 commands:
-  sync [--batch | --no-input | --auto]   scan PATH and pick new tools
+  sync [--batch | --no-input | --auto]           scan PATH and pick new tools
+  list [--all | --pending | --ignored | --stale] show tools (enabled by default)
+  enable <tool>... [--desc "text"]               use tools; --desc sets your description
+  ignore <tool>...                               stop offering tools
+  context                                        print the tool list for agents
 `
 )
 
@@ -46,6 +49,14 @@ func Run(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "sync":
 		return runSync(args[1:], stdin, stdout, stderr)
+	case "list":
+		return runList(args[1:], stdout, stderr)
+	case "enable":
+		return runStatus("enable", registry.Enabled, args[1:], stdout, stderr)
+	case "ignore":
+		return runStatus("ignore", registry.Ignored, args[1:], stdout, stderr)
+	case "context":
+		return runContext(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return exitOK
@@ -83,7 +94,7 @@ func runSync(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 		Env:     env,
 		Store:   registry.Store{Dir: dir},
 		Chooser: chooser,
-		Now:     func() time.Time { return time.Now().UTC().Truncate(time.Second) },
+		Now:     now,
 		Probe:   probe.Probe,
 		Out:     stdout,
 	})
