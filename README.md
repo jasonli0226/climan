@@ -3,8 +3,7 @@
 A catalog of the CLI tools installed on your machine, and of how your AI agents
 should use them.
 
-> **Status:** early. `sync`, `list`, `enable`, `ignore` and `context` work on
-> Linux and Windows. `register`, `describe` and `skill` are planned. See
+> **Status:** early. All v1 commands work on Linux and Windows. See
 > [docs/design.md](docs/design.md) for the full design.
 
 ## Why
@@ -41,14 +40,9 @@ climan list                       # show kept tools; ? marks weak descriptions
 climan enable zoxide --desc "jump to frequent dirs"   # fix a description
 climan list --pending             # tools you have not decided on yet
 climan context                    # the tool list agents read
-```
-
-Planned:
-
-```sh
-climan describe rg                # full metadata for one tool
-climan register alias://gs --desc "git status"
-climan skill rg --out ~/agent-skills
+climan describe uv                # everything known about one tool
+climan register alias://gs --desc "git status"   # add an alias by hand
+climan skill --all --out ~/agent-skills          # one SKILL.md per enabled tool
 ```
 
 ## Using with agents
@@ -65,11 +59,11 @@ read on every task.
 |---|---|
 | `sync [--batch \| --auto]` | Scan and pick new tools. `--batch` runs without prompts (for cron); `--auto` applies `rules.yaml`. |
 | `enable <tool>... [--desc "text"]` / `ignore <tool>...` | Keep tools, or stop being asked about them. `--desc` sets your own description, which agents see instead of the probed one. |
-| `register <id>` (planned) | Add an entry by hand: a script (`file://...`), alias (`alias://...`), or MCP server (`mcp://...`). |
+| `register <id> [--desc] [--tags a,b]` | Add an entry by hand: a script (`file://...`), alias (`alias://...`), or MCP server (`mcp://...`). |
 | `list [--all \| --pending \| --ignored \| --stale]` | Show kept tools, or other groups. |
 | `context` | Print the short tool list agents read on every task. |
-| `describe <tool>` (planned) | Show everything known about a tool. |
-| `skill <tool> \| --all` (planned) | Write `SKILL.md` files for agents. |
+| `describe <tool> [--probe]` | Show everything known about a tool; `--probe` reruns its `--version` and `--help`. |
+| `skill <tool> \| --all [--out dir]` | Write `<dir>/<category>/<tool>/SKILL.md` for agents. Never overwrites a SKILL.md you wrote yourself. |
 
 ## Registry example
 
@@ -93,4 +87,4 @@ The exact schema is not final.
 |---|---|
 | `~/.config/climan/registry.yaml` | Your tools and notes |
 | `~/.config/climan/rules.yaml` | Auto-enable rules for `sync --auto` |
-| `~/.config/climan/config.yaml` | Settings, such as `skills_dir` |
+| `~/.config/climan/config.yaml` | Settings: `skills_dir: ~/agent-skills` sets the default `skill --out` |
