@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jasonli0226/climan/internal/describe"
 	"github.com/jasonli0226/climan/internal/discover"
 	"github.com/jasonli0226/climan/internal/platform"
 	"github.com/jasonli0226/climan/internal/probe"
@@ -197,5 +198,32 @@ func runRegister(args []string, stdout, stderr io.Writer) int {
 		return fail(stderr, err)
 	}
 	fmt.Fprintf(stdout, "registered: %s\n", key)
+	return exitOK
+}
+
+func runDescribe(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("describe", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	doProbe := fs.Bool("probe", false, "run the tool's --version and --help now")
+	names, err := parseInterleaved(fs, args)
+	if err != nil {
+		return exitUsage
+	}
+	if len(names) != 1 {
+		fmt.Fprintf(stderr, "climan describe: name exactly one tool\n\n%s", usage)
+		return exitUsage
+	}
+	env := platform.Current()
+	dir, err := env.ConfigDir()
+	if err != nil {
+		return fail(stderr, err)
+	}
+	o := describe.Options{Env: env, Store: registry.Store{Dir: dir}, Out: stdout}
+	if *doProbe {
+		o.Probe = probe.Probe
+	}
+	if err := describe.Run(context.Background(), o, names[0]); err != nil {
+		return fail(stderr, err)
+	}
 	return exitOK
 }

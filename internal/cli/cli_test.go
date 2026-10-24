@@ -205,3 +205,28 @@ func TestRegisterBadID(t *testing.T) {
 		t.Fatalf("code = %d, want 2", code)
 	}
 }
+
+func TestDescribeCommand(t *testing.T) {
+	sandbox(t)
+	mustRun(t, "sync", "--batch")
+	if out := mustRun(t, "describe", "mytool"); !strings.HasPrefix(out, "mytool\n") {
+		t.Fatalf("describe = %q", out)
+	}
+}
+
+func TestDescribeUnknownCommand(t *testing.T) {
+	sandbox(t)
+	code, _, stderr := run(t, "describe", "nope")
+	if code != 1 || !strings.Contains(stderr, "unknown tool: nope") {
+		t.Fatalf("code=%d stderr=%q", code, stderr)
+	}
+}
+
+func TestDescribeNeedsOneName(t *testing.T) {
+	sandbox(t)
+	for _, args := range [][]string{{"describe"}, {"describe", "a", "b"}} {
+		if code, _, _ := run(t, args...); code != 2 {
+			t.Errorf("%v: code = %d, want 2", args, code)
+		}
+	}
+}

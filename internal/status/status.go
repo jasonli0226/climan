@@ -105,13 +105,13 @@ func resolve(o Options, reg *registry.Registry, names []string) ([]string, error
 	scannedOnce := false
 
 	for _, name := range names {
-		key, ok := lookupRegistry(o.Env, reg, name)
+		key, ok := Lookup(o.Env, reg, name)
 		if !ok {
 			if !scannedOnce {
 				scanned = discover.Group(discover.Scan(o.Env))
 				scannedOnce = true
 			}
-			t, found := lookupScan(o.Env, scanned, name)
+			t, found := LookupScan(o.Env, scanned, name)
 			if !found {
 				unknown = append(unknown, name)
 				continue
@@ -139,8 +139,8 @@ func sameName(env platform.Env, a, b string) bool {
 	return a == b
 }
 
-// lookupRegistry finds name as a key first, then as a family member.
-func lookupRegistry(env platform.Env, reg *registry.Registry, name string) (string, bool) {
+// Lookup finds name in the registry as a key first, then as a family member.
+func Lookup(env platform.Env, reg *registry.Registry, name string) (string, bool) {
 	for key := range reg.Tools {
 		if sameName(env, key, name) {
 			return key, true
@@ -156,9 +156,9 @@ func lookupRegistry(env platform.Env, reg *registry.Registry, name string) (stri
 	return "", false
 }
 
-// lookupScan finds name among scanned tools by key, then member; the noise
+// LookupScan finds name among scanned tools by key, then member; the noise
 // flag is ignored.
-func lookupScan(env platform.Env, tools []discover.Tool, name string) (discover.Tool, bool) {
+func LookupScan(env platform.Env, tools []discover.Tool, name string) (discover.Tool, bool) {
 	for _, t := range tools {
 		if sameName(env, t.Key, name) {
 			return t, true
