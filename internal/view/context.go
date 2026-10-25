@@ -10,7 +10,7 @@ import (
 
 const (
 	contextHeader = "Installed CLI tools on this machine (from climan). Prefer one of these over writing a script; run `<tool> --help` for usage."
-	contextEmpty  = "No tools enabled yet. Run: climan sync"
+	contextEmpty  = "No tools enabled yet. Tell the user to run `climan sync` (interactive; do not run it yourself)."
 )
 
 // Context renders the inventory agents read at the start of every task:

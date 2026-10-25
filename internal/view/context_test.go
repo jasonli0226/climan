@@ -56,7 +56,7 @@ func TestContextSkipsAbsent(t *testing.T) {
 }
 
 func TestContextEmpty(t *testing.T) {
-	want := header + "No tools enabled yet. Run: climan sync\n"
+	want := header + "No tools enabled yet. Tell the user to run `climan sync` (interactive; do not run it yourself).\n"
 	if got := Context(platform.Env{}, registry.New()); got != want {
 		t.Fatalf("Context = %q, want %q", got, want)
 	}

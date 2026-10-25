@@ -48,7 +48,7 @@ climan skill --all --out ~/agent-skills          # one SKILL.md per enabled tool
 ## Using with agents
 
 [`skills/climan/SKILL.md`](skills/climan/SKILL.md) teaches an agent to run
-`climan context` at the start of every task and to use an installed tool
+`climan context` once per session and to use an installed tool
 before writing its own script. Copy it into your agent's skills directory.
 `context` lists enabled tools only, one line each, so it stays short enough to
 read on every task.
