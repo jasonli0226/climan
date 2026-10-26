@@ -28,9 +28,25 @@ come back when you reinstall it.
 
 ## Install
 
+Download the archive for your system from
+[Releases](https://github.com/jasonli0226/climan/releases) (Linux and
+Windows, amd64 and arm64), unpack it, and put `climan` (`climan.exe` on
+Windows) on your PATH. `checksums.txt` lists each archive's SHA-256.
+
+Or build it with Go:
+
 ```sh
 go install github.com/jasonli0226/climan@latest
 ```
+
+`climan version` prints the installed version.
+
+## Releasing
+
+Push a tag from main: `git tag v0.1.0 && git push origin v0.1.0`. The
+release workflow tests on Linux and Windows, then GoReleaser builds the
+archives and publishes the GitHub Release. Check `.goreleaser.yaml` with
+`goreleaser check` after changing it.
 
 ## Quickstart
 
@@ -84,6 +100,7 @@ an agent by hand, then run `climan install`.
 | `context` | Print the short tool list agents read on every task. |
 | `describe <tool> [--probe]` | Show everything known about a tool; `--probe` reruns its `--version` and `--help`. |
 | `install [--agent claude,pi,opencode]` | Put the climan skill in each agent's global skills folder. Never overwrites a skill file without climan's marker line, or a symlink. |
+| `version` | Print climan's version. |
 
 ## Registry example
 
