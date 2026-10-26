@@ -63,7 +63,7 @@ read on every task.
 | `list [--all \| --pending \| --ignored \| --stale]` | Show kept tools, or other groups. |
 | `context` | Print the short tool list agents read on every task. |
 | `describe <tool> [--probe]` | Show everything known about a tool; `--probe` reruns its `--version` and `--help`. |
-| `skill <tool> \| --all [--out dir]` | Write `<dir>/<category>/<tool>/SKILL.md` for agents. Never overwrites a SKILL.md you wrote yourself. |
+| `skill <tool> \| --all [--out dir]` | Write `<dir>/<category>/<tool>/SKILL.md` for an enabled, installed tool. Never overwrites a SKILL.md you wrote yourself or one written for another tool. |
 
 ## Registry example
 

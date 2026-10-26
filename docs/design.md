@@ -181,7 +181,9 @@ Tools that match no rule stay `pending`.
 - `enable <tool>` / `ignore <tool>`: change an entry's status.
 - `list [--all | --pending | --ignored | --stale]`: enabled tools by default.
 - `describe <tool>`: show full metadata.
-- `skill <tool> --out <dir>`: write one tool's skill file under `<dir>`.
+- `skill <tool> --out <dir>`: write one enabled, present tool's skill file
+  under `<dir>`. Two keys that slug to the same path fail; an existing
+  generated file for a different key is skipped.
 - `skill --all --out <dir>`: write skill files for every enabled tool that is
   present (the same set as `context`).
   `--out` defaults to `skills_dir` in `~/.config/climan/config.yaml`.

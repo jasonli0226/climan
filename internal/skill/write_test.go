@@ -99,3 +99,34 @@ func TestWriteHelpOnlyWhenPresent(t *testing.T) {
 		t.Fatalf("help calls = %v, want only rg", h.calls)
 	}
 }
+
+func TestWriteRejectsSlugCollision(t *testing.T) {
+	reg, outDir, _, _, o := setup(t)
+	reg.Tools["a.b"] = &registry.Entry{Status: registry.Enabled, Source: registry.Registered}
+	reg.Tools["a_b"] = &registry.Entry{Status: registry.Enabled, Source: registry.Registered}
+	err := Write(context.Background(), o, reg, []string{"rg", "a.b", "a_b"}, outDir)
+	if err == nil || !strings.Contains(err.Error(), "a.b") || !strings.Contains(err.Error(), "a_b") {
+		t.Fatalf("err = %v, want collision naming both keys", err)
+	}
+	if entries, _ := os.ReadDir(outDir); len(entries) != 0 {
+		t.Fatalf("wrote %d entries before failing", len(entries))
+	}
+}
+
+func TestWriteSkipsOtherToolsSkill(t *testing.T) {
+	reg, outDir, _, out, o := setup(t)
+	reg.Tools["a.b"] = &registry.Entry{Status: registry.Enabled, Source: registry.Registered, Desc: "first"}
+	reg.Tools["a_b"] = &registry.Entry{Status: registry.Enabled, Source: registry.Registered, Desc: "second"}
+	if err := Write(context.Background(), o, reg, []string{"a.b"}, outDir); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := Write(context.Background(), o, reg, []string{"a_b"}, outDir); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(outDir, "cli", "a-b", "SKILL.md")
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "first") || out.String() != "skipped: "+path+" (written for a.b)\n" {
+		t.Fatalf("file %q output %q", data, out.String())
+	}
+}

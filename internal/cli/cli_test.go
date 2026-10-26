@@ -286,3 +286,38 @@ func TestSkillUnknown(t *testing.T) {
 		t.Fatalf("code=%d stderr=%q entries=%d", code, stderr, len(entries))
 	}
 }
+
+func TestSkillNeedsEnabledTool(t *testing.T) {
+	for _, tc := range []struct{ setup, want string }{
+		{"ignore", "mytool is ignored"},
+		{"sync", "mytool is pending"},
+	} {
+		t.Run(tc.setup, func(t *testing.T) {
+			sandbox(t)
+			out := t.TempDir()
+			mustRun(t, tc.setup, map[string]string{"ignore": "mytool", "sync": "--no-input"}[tc.setup])
+			code, _, stderr := run(t, "skill", "mytool", "--out", out)
+			entries, _ := os.ReadDir(out)
+			if code != 1 || !strings.Contains(stderr, tc.want) || len(entries) != 0 {
+				t.Fatalf("code=%d stderr=%q entries=%d", code, stderr, len(entries))
+			}
+		})
+	}
+}
+
+func TestSkillNeedsInstalledTool(t *testing.T) {
+	sandbox(t)
+	out := t.TempDir()
+	script := filepath.Join(t.TempDir(), "gone.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, "register", "file://"+filepath.ToSlash(script), "--desc", "a script")
+	if err := os.Remove(script); err != nil {
+		t.Fatal(err)
+	}
+	code, _, stderr := run(t, "skill", "file://"+filepath.ToSlash(script), "--out", out)
+	if code != 1 || !strings.Contains(stderr, "not installed") {
+		t.Fatalf("code=%d stderr=%q", code, stderr)
+	}
+}

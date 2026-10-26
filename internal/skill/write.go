@@ -24,13 +24,19 @@ type Options struct {
 }
 
 // Write renders one SKILL.md per key into outDir/<category>/<slug>/. It
-// overwrites files climan wrote and skips any other existing file.
+// overwrites files climan wrote for the same key and skips any other
+// existing file. Keys that map to the same path fail before anything is
+// written.
 func Write(ctx context.Context, o Options, reg *registry.Registry, keys []string, outDir string) error {
-	for _, key := range keys {
+	paths, err := skillPaths(reg, keys, outDir)
+	if err != nil {
+		return err
+	}
+	for i, key := range keys {
 		e := reg.Tools[key]
-		path := filepath.Join(outDir, Category(e), Slug(key), FileName)
-		if handWritten(path) {
-			fmt.Fprintf(o.Out, "skipped: %s (not written by climan)\n", path)
+		path := paths[i]
+		if why := skipReason(path, key); why != "" {
+			fmt.Fprintf(o.Out, "skipped: %s (%s)\n", path, why)
 			continue
 		}
 		help := ""
@@ -52,8 +58,45 @@ func Write(ctx context.Context, o Options, reg *registry.Registry, keys []string
 	return nil
 }
 
-// handWritten reports an existing file that lacks climan's marker.
-func handWritten(path string) bool {
+// skillPaths maps each key to its SKILL.md path, failing when two keys
+// slug to the same one.
+func skillPaths(reg *registry.Registry, keys []string, outDir string) ([]string, error) {
+	paths := make([]string, len(keys))
+	owners := make(map[string]string, len(keys))
+	for i, key := range keys {
+		path := filepath.Join(outDir, Category(reg.Tools[key]), Slug(key), FileName)
+		if other, ok := owners[path]; ok {
+			return nil, fmt.Errorf("%s and %s would both write %s", other, key, path)
+		}
+		owners[path] = key
+		paths[i] = path
+	}
+	return paths, nil
+}
+
+// skipReason explains why an existing file at path must not be replaced
+// with key's skill, or returns "" when it may be.
+func skipReason(path, key string) string {
 	data, err := os.ReadFile(path)
-	return err == nil && !strings.Contains(string(data), Marker)
+	if err != nil {
+		return ""
+	}
+	if !strings.Contains(string(data), Marker) {
+		return "not written by climan"
+	}
+	if owner := owner(string(data)); owner != "" && owner != key {
+		return "written for " + owner
+	}
+	return ""
+}
+
+// owner is the key a generated SKILL.md was written for: the heading Render
+// puts right after the marker.
+func owner(doc string) string {
+	_, rest, ok := strings.Cut(doc, Marker+"\n\n# ")
+	if !ok {
+		return ""
+	}
+	key, _, _ := strings.Cut(rest, "\n")
+	return key
 }

@@ -265,6 +265,12 @@ func runSkill(args []string, stdout, stderr io.Writer) int {
 		if !ok {
 			return fail(stderr, fmt.Errorf("%w: %s", status.ErrUnknown, names[0]))
 		}
+		if e := reg.Tools[key]; e.Status != registry.Enabled {
+			return fail(stderr, fmt.Errorf("%s is %s; enable it first", key, e.Status))
+		}
+		if !view.Present(env, reg, key) {
+			return fail(stderr, fmt.Errorf("%s is not installed now", key))
+		}
 		keys = []string{key}
 	}
 	o := skill.Options{Env: env, Help: probe.Help, Out: stdout}
