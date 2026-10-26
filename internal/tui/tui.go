@@ -13,23 +13,27 @@ import (
 	"github.com/jasonli0226/climan/internal/syncer"
 )
 
-const title = "New tools found — space to toggle, a for all, enter to confirm"
+const (
+	title       = "New tools found — space to toggle, a for all, enter to confirm"
+	reviewTitle = "Ignored tools — check to enable, enter to confirm (unchecked stay ignored)"
+)
 
 // ErrCancelled is returned when the user quits the picker.
 var ErrCancelled = errors.New("sync cancelled; nothing changed")
 
 // HuhChooser asks the user which new tools to enable. Every tool starts
-// unchecked; checked tools become enabled and the rest ignored.
-type HuhChooser struct{}
+// unchecked; checked tools become enabled and the rest ignored. With Review
+// set, the candidates are already ignored and the title says so.
+type HuhChooser struct{ Review bool }
 
-func (HuhChooser) Choose(cands []syncer.Candidate) (map[string]syncer.Decision, error) {
+func (h HuhChooser) Choose(cands []syncer.Candidate) (map[string]syncer.Decision, error) {
 	opts := make([]huh.Option[string], 0, len(cands))
 	for _, c := range cands {
 		opts = append(opts, huh.NewOption(label(c), c.Key))
 	}
 	var selected []string
 	field := huh.NewMultiSelect[string]().
-		Title(title).
+		Title(h.title()).
 		Options(opts...).
 		Value(&selected).
 		Height(min(len(cands)+2, 20))
@@ -46,6 +50,13 @@ func (HuhChooser) Choose(cands []syncer.Candidate) (map[string]syncer.Decision, 
 		return nil, err
 	}
 	return decisions(cands, selected), nil
+}
+
+func (h HuhChooser) title() string {
+	if h.Review {
+		return reviewTitle
+	}
+	return title
 }
 
 // label is one picker row: key (with family size), shim kind, path.

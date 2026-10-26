@@ -63,10 +63,14 @@ func (f *fixture) env() platform.Env {
 	}
 }
 
-func (f *fixture) run(c Chooser) error {
+func (f *fixture) run(c Chooser) error { return f.runWith(c, false) }
+
+func (f *fixture) review(c Chooser) error { return f.runWith(c, true) }
+
+func (f *fixture) runWith(c Chooser, review bool) error {
 	f.out.Reset()
 	return Run(context.Background(), Options{
-		Env: f.env(), Store: f.store, Chooser: c,
+		Env: f.env(), Store: f.store, Chooser: c, Review: review,
 		Now: func() time.Time { return time.Date(2026, 10, 25, 9, 0, 0, 0, time.UTC) },
 		Probe: func(_ context.Context, _ platform.Env, path string) probe.Info {
 			time.Sleep(f.delay)
@@ -169,7 +173,7 @@ func TestRunMissingDecisionIsPending(t *testing.T) {
 
 func TestRunNoCandidatesSkipsChooser(t *testing.T) {
 	f := newFixture(t, "a")
-	if err := f.run(BatchChooser{}); err != nil {
+	if err := f.run(&fakeChooser{decisions: map[string]Decision{"a": {Status: registry.Ignored}}}); err != nil {
 		t.Fatal(err)
 	}
 	c := &fakeChooser{}
@@ -307,5 +311,84 @@ func TestRunDecisionDoesNotOverrideEditMeanwhile(t *testing.T) {
 	}
 	if got := f.entry("a").Status; got != registry.Ignored {
 		t.Fatalf("a = %q, want ignored (status set meanwhile wins)", got)
+	}
+}
+
+func TestRunOffersPendingFromEarlierSync(t *testing.T) {
+	f := newFixture(t, "a")
+	if err := f.run(BatchChooser{}); err != nil {
+		t.Fatal(err)
+	}
+	f.add(f.bin, "b")
+	c := &fakeChooser{decisions: map[string]Decision{
+		"a": {Status: registry.Enabled}, "b": {Status: registry.Enabled},
+	}}
+	if err := f.run(c); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(c.seen, []string{"a", "b"}) {
+		t.Fatalf("chooser saw %v, want [a b] (pending a from batch sync)", c.seen)
+	}
+	if got := f.entry("a").Status; got != registry.Enabled {
+		t.Fatalf("a = %q, want enabled", got)
+	}
+	if want := "new: 1, enabled: 2"; !strings.Contains(f.out.String(), want) {
+		t.Fatalf("summary %q lacks %q (only b is new)", f.out.String(), want)
+	}
+}
+
+func TestReviewEnablesCheckedIgnoredTools(t *testing.T) {
+	f := newFixture(t, "a", "b", "c", "gone", "_noise")
+	first := &fakeChooser{decisions: map[string]Decision{
+		"a": {Status: registry.Ignored}, "b": {Status: registry.Ignored},
+		"c": {Status: registry.Enabled}, "gone": {Status: registry.Ignored},
+	}}
+	if err := f.run(first); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(f.bin, "gone.exe")); err != nil {
+		t.Fatal(err)
+	}
+	f.add(f.bin, "d")
+	f.probed = nil
+	c := &fakeChooser{decisions: map[string]Decision{
+		"a": {Status: registry.Enabled}, "b": {Status: registry.Ignored},
+	}}
+	if err := f.review(c); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(c.seen, []string{"a", "b"}) {
+		t.Fatalf("review offered %v, want [a b] (no enabled, missing, noise or new tools)", c.seen)
+	}
+	if a, b := f.entry("a").Status, f.entry("b").Status; a != registry.Enabled || b != registry.Ignored {
+		t.Fatalf("a=%q b=%q, want enabled ignored", a, b)
+	}
+	if got := f.entry("d").Status; got != registry.Pending {
+		t.Fatalf("d = %q, want pending (new tools wait for a normal sync)", got)
+	}
+	if !reflect.DeepEqual(f.probed, []string{"a.exe"}) {
+		t.Fatalf("probed %v, want [a.exe]", f.probed)
+	}
+}
+
+func TestReviewDecisionDoesNotOverrideEditMeanwhile(t *testing.T) {
+	f := newFixture(t, "a")
+	if err := f.run(&fakeChooser{decisions: map[string]Decision{"a": {Status: registry.Ignored}}}); err != nil {
+		t.Fatal(err)
+	}
+	c := &fakeChooser{decisions: map[string]Decision{"a": {Status: registry.Enabled}}}
+	c.during = func() {
+		if err := f.store.Update(func(r *registry.Registry) error {
+			r.Tools["a"].Status = registry.Pending
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := f.review(c); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.entry("a").Status; got != registry.Pending {
+		t.Fatalf("a = %q, want pending (status set meanwhile wins)", got)
 	}
 }

@@ -29,6 +29,7 @@ const (
 
 commands:
   sync [--batch | --no-input | --auto]           scan PATH and pick new tools
+  sync --review                                  pick ignored tools to enable after all
   list [--all | --pending | --ignored | --stale] show tools (enabled by default)
   list --unreviewed                              enabled tools with no desc yet
   enable <tool>... [--desc "text"]               use tools; --desc sets your description
@@ -42,7 +43,7 @@ commands:
 )
 
 // newInteractive builds the TUI chooser.
-var newInteractive = func() syncer.Chooser { return tui.HuhChooser{} }
+var newInteractive = func(review bool) syncer.Chooser { return tui.HuhChooser{Review: review} }
 
 // pickAgents asks which detected agents to install into.
 var pickAgents = tui.PickAgents
@@ -85,15 +86,20 @@ func Run(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 func runSync(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var batch, auto bool
+	var batch, auto, review bool
 	fs.BoolVar(&batch, "batch", false, "do not prompt; new tools stay pending")
 	fs.BoolVar(&batch, "no-input", false, "alias for --batch")
 	fs.BoolVar(&auto, "auto", false, "do not prompt; apply rules.yaml")
+	fs.BoolVar(&review, "review", false, "pick ignored tools to enable")
 	if err := fs.Parse(args); err != nil {
 		return exitUsage
 	}
 	if batch && auto {
 		fmt.Fprintln(stderr, "climan sync: --batch and --auto cannot be used together")
+		return exitUsage
+	}
+	if review && (batch || auto) {
+		fmt.Fprintln(stderr, "climan sync: --review cannot be used with --batch or --auto")
 		return exitUsage
 	}
 
@@ -102,7 +108,7 @@ func runSync(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stderr, err)
 	}
-	chooser, err := pickChooser(env, dir, batch, auto, stdin)
+	chooser, err := pickChooser(env, dir, batch, auto, review, stdin)
 	if err != nil {
 		return fail(stderr, err)
 	}
@@ -113,6 +119,7 @@ func runSync(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 		Now:     now,
 		Probe:   probe.Probe,
 		Out:     stdout,
+		Review:  review,
 	})
 	if err != nil {
 		return fail(stderr, err)
@@ -120,7 +127,7 @@ func runSync(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 	return exitOK
 }
 
-func pickChooser(env platform.Env, dir string, batch, auto bool, stdin *os.File) (syncer.Chooser, error) {
+func pickChooser(env platform.Env, dir string, batch, auto, review bool, stdin *os.File) (syncer.Chooser, error) {
 	switch {
 	case batch:
 		return syncer.BatchChooser{}, nil
@@ -130,10 +137,12 @@ func pickChooser(env platform.Env, dir string, batch, auto bool, stdin *os.File)
 			return nil, err
 		}
 		return syncer.AutoChooser{Rules: r}, nil
+	case !term.IsTerminal(int(stdin.Fd())) && review:
+		return nil, errors.New("--review needs a terminal")
 	case !term.IsTerminal(int(stdin.Fd())):
 		return nil, errors.New("stdin is not a terminal; use --batch or --auto")
 	default:
-		return newInteractive(), nil
+		return newInteractive(review), nil
 	}
 }
 

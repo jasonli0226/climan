@@ -23,6 +23,9 @@ type Options struct {
 	Now     func() time.Time
 	Probe   probe.Func
 	Out     io.Writer
+	// Review offers the ignored tools found by the scan instead of the
+	// pending ones, so the user can enable some after all.
+	Review bool
 }
 
 // Run scans PATH, asks the Chooser about new tools, and writes the registry.
@@ -42,7 +45,12 @@ func Run(ctx context.Context, o Options) error {
 	if err != nil {
 		return err
 	}
-	cands := candidates(reconcile.Reconcile(preview, tools, now).New, byKey, preview)
+	found := reconcile.Reconcile(preview, tools, now).New
+	from := registry.Pending
+	if o.Review {
+		from = registry.Ignored
+	}
+	cands := candidates(offered(preview, byKey, from), byKey, preview)
 
 	decisions := map[string]Decision{}
 	if len(cands) > 0 {
@@ -55,7 +63,7 @@ func Run(ctx context.Context, o Options) error {
 	var toProbe []string
 	err = o.Store.Update(func(reg *registry.Registry) error {
 		res = reconcile.Reconcile(reg, tools, now)
-		toProbe = apply(reg, decisions)
+		toProbe = apply(reg, decisions, from)
 		return nil
 	})
 	if err != nil {
@@ -64,8 +72,23 @@ func Run(ctx context.Context, o Options) error {
 	if err := probeAll(ctx, o, toProbe); err != nil {
 		return err
 	}
-	printSummary(o.Out, newKeys(cands, res.New), decisions, len(res.Stale))
+	printSummary(o.Out, union(found, res.New), union(keysOf(cands), res.New), decisions, len(res.Stale))
 	return nil
+}
+
+// offered is every discovered tool found by this scan whose status is from,
+// sorted. For pending that is new tools plus those left pending by an
+// earlier --batch or --auto sync. Noise, ignored on sight, is never offered.
+func offered(reg *registry.Registry, byKey map[string]discover.Tool, from registry.Status) []string {
+	var keys []string
+	for k, e := range reg.Tools {
+		t, ok := byKey[k]
+		if ok && !t.Noise && e.Source == registry.Discovered && e.Status == from {
+			keys = append(keys, k)
+		}
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 func candidates(keys []string, byKey map[string]discover.Tool, reg *registry.Registry) []Candidate {
@@ -77,11 +100,12 @@ func candidates(keys []string, byKey map[string]discover.Tool, reg *registry.Reg
 	return out
 }
 
-// apply sets the status of each decided tool that is still pending, so a
-// decision survives another sync adding the tool meanwhile, but never
-// overrides a status set in the meantime. It returns the keys of newly
-// enabled installed tools, which are the ones to probe.
-func apply(reg *registry.Registry, decisions map[string]Decision) []string {
+// apply sets the status of each decided tool that still has the status it
+// was offered with (from), so a decision survives another sync adding the
+// tool meanwhile, but never overrides a status set in the meantime. It
+// returns the keys of newly enabled installed tools, which are the ones to
+// probe.
+func apply(reg *registry.Registry, decisions map[string]Decision, from registry.Status) []string {
 	keys := make([]string, 0, len(decisions))
 	for k := range decisions {
 		keys = append(keys, k)
@@ -91,7 +115,7 @@ func apply(reg *registry.Registry, decisions map[string]Decision) []string {
 	for _, k := range keys {
 		d := decisions[k]
 		e := reg.Tools[k]
-		if e == nil || e.Source != registry.Discovered || e.Status != registry.Pending || d.Status == "" {
+		if e == nil || e.Source != registry.Discovered || e.Status != from || d.Status == "" || d.Status == from {
 			continue
 		}
 		e.Status = d.Status
@@ -132,9 +156,11 @@ func probeAll(ctx context.Context, o Options, keys []string) error {
 	})
 }
 
-func printSummary(w io.Writer, newKeys []string, decisions map[string]Decision, stale int) {
+// printSummary counts newly found tools as new, and every tool that was up
+// for a decision (offered, or found after the prompt opened) by outcome.
+func printSummary(w io.Writer, newKeys, decided []string, decisions map[string]Decision, stale int) {
 	count := map[registry.Status]int{}
-	for _, k := range newKeys {
+	for _, k := range decided {
 		s := decisions[k].Status
 		if s == "" {
 			s = registry.Pending
@@ -145,17 +171,21 @@ func printSummary(w io.Writer, newKeys []string, decisions map[string]Decision, 
 		len(newKeys), count[registry.Enabled], count[registry.Ignored], count[registry.Pending], stale)
 }
 
-// newKeys is every tool that was new this run: those offered to the chooser
-// plus any found after the prompt opened.
-func newKeys(cands []Candidate, added []string) []string {
-	keys := make([]string, 0, len(cands)+len(added))
+func keysOf(cands []Candidate) []string {
+	keys := make([]string, 0, len(cands))
 	for _, c := range cands {
 		keys = append(keys, c.Key)
 	}
-	for _, k := range added {
-		if !slices.Contains(keys, k) {
-			keys = append(keys, k)
+	return keys
+}
+
+// union returns a followed by the keys of b not already in a.
+func union(a, b []string) []string {
+	out := slices.Clone(a)
+	for _, k := range b {
+		if !slices.Contains(out, k) {
+			out = append(out, k)
 		}
 	}
-	return keys
+	return out
 }

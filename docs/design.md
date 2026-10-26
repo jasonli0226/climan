@@ -20,10 +20,14 @@ does, and how agents should use it.
 
 - `sync` scans PATH and known install dirs, then diffs the results against the
   registry. Newly found binaries enter as `pending`.
-- Interactive sync opens a TUI listing new tools, **unchecked by default**. The
+- Interactive sync opens a TUI listing new tools, plus tools still `pending`
+  from an earlier `--batch` or `--auto` run, **unchecked by default**. The
   user toggles tools on (space / `a` for all / enter to confirm). Checked tools
   become `enabled`; unchecked tools become `ignored`, so they are not offered
   again. Adopting a tool is the act of curation.
+- `sync --review` opens the same TUI over `ignored` tools found by the scan
+  (noise excluded). Checked tools become `enabled`; unchecked ones stay
+  `ignored`, so review never demotes anything.
 - Escape hatches:
   - `sync --batch` (alias `--no-input`): non-interactive. New tools stay
     `pending` and nothing is enabled. Safe for cron.
@@ -136,6 +140,7 @@ Transitions:
 - Found by sync for the first time → `pending`.
 - Checked in the sync TUI, or `climan enable <tool>` → `enabled`.
 - Left unchecked in the sync TUI, or `climan ignore <tool>` → `ignored`.
+- Checked in `sync --review` → `enabled`.
 - `climan enable` / `climan ignore` can move any entry between states later.
 
 Presence:
@@ -180,7 +185,8 @@ Tools that match no rule stay `pending`.
 
 ## Commands (v1 scope)
 
-- `sync [--batch | --auto]`: scan, diff, interactive adopt.
+- `sync [--batch | --auto | --review]`: scan, diff, interactive adopt;
+  `--review` re-offers ignored tools.
 - `register <id> [--desc ...] [--tags ...]`: manually add one entry (off-PATH
   scripts, aliases, MCP servers).
 - `enable <tool>` / `ignore <tool>`: change an entry's status.
