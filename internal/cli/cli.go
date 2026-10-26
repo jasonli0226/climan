@@ -37,6 +37,7 @@ commands:
   describe <tool> [--probe]                      show everything known about a tool
   context                                        print the tool list for agents
   install [--agent claude,pi,opencode]           put the climan skill where agents load it
+  version                                        print climan's version
 `
 )
 
@@ -70,6 +71,8 @@ func Run(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 		return runContext(args[1:], stdout, stderr)
 	case "install":
 		return runInstall(args[1:], stdin, stdout, stderr)
+	case "version", "--version", "-v":
+		return runVersion(stdout)
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return exitOK
