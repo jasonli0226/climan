@@ -1,0 +1,2 @@
+# Skills are embedded into the binary; keep their bytes identical on every OS.
+skills/** text eol=lf
