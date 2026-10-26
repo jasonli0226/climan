@@ -16,8 +16,11 @@ them to check it.
 
 ## How it works
 
-1. `climan sync` scans your PATH and common install dirs. New tools show up
-   unchecked in a picker; you check the ones you want to keep.
+1. `climan sync` scans your PATH and common install dirs. New tools, and any
+   still pending from an earlier `--batch` or `--auto` run, show up unchecked
+   in a picker; you check the ones you want to keep. Unchecked tools are
+   ignored and not offered again; `climan sync --review` lets you pick from
+   them later.
 2. Kept tools are stored in `~/.config/climan/registry.yaml`, along with any
    notes, tags, and usage snippets you add. You can edit the file by hand.
 3. `climan context` turns the registry into something an agent can read, and
@@ -52,6 +55,7 @@ archives and publishes the GitHub Release. Check `.goreleaser.yaml` with
 
 ```sh
 climan sync                       # scan and pick tools to keep
+climan sync --review              # pick tools you left unchecked before
 climan list                       # show kept tools; ? marks weak descriptions
 climan enable zoxide --desc "jump to frequent dirs"   # fix a description
 climan list --pending             # tools you have not decided on yet
@@ -93,7 +97,8 @@ an agent by hand, then run `climan install`.
 
 | Command | What it does |
 |---|---|
-| `sync [--batch \| --no-input \| --auto]` | Scan and pick new tools. `--batch` runs without prompts (for cron), and `--no-input` is the same as `--batch`; `--auto` applies `rules.yaml`. |
+| `sync [--batch \| --no-input \| --auto]` | Scan and pick new tools. `--batch` runs without prompts (for cron), and `--no-input` is the same as `--batch`; `--auto` applies `rules.yaml`. Pending tools from earlier runs are offered too. |
+| `sync --review` | Pick ignored tools to enable after all. Unchecked ones stay ignored; noise is not shown. |
 | `enable <tool>... [--desc "text"]` / `ignore <tool>...` | Keep tools, or stop being asked about them. `--desc` sets your own description, which agents see instead of the probed one. |
 | `register <id> [--desc] [--tags a,b]` | Add an entry by hand: a script (`file://...`), alias (`alias://...`), or MCP server (`mcp://...`). |
 | `list [--all \| --pending \| --ignored \| --stale \| --unreviewed]` | Show kept tools, or other groups. `--unreviewed` shows enabled tools with no desc yet, the ones an agent should review. |

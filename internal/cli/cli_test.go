@@ -52,6 +52,24 @@ func TestSyncFlagsExclusive(t *testing.T) {
 	}
 }
 
+func TestSyncReviewExclusive(t *testing.T) {
+	sandbox(t)
+	for _, other := range []string{"--batch", "--no-input", "--auto"} {
+		code, _, stderr := run(t, "sync", "--review", other)
+		if code != 2 || !strings.Contains(stderr, "--review") {
+			t.Fatalf("%s: code=%d stderr=%q, want 2 naming --review", other, code, stderr)
+		}
+	}
+}
+
+func TestSyncReviewNeedsTerminal(t *testing.T) {
+	sandbox(t)
+	code, _, stderr := run(t, "sync", "--review")
+	if code != 1 || !strings.Contains(stderr, "--review needs a terminal") {
+		t.Fatalf("code=%d stderr=%q", code, stderr)
+	}
+}
+
 func TestNoInputAlias(t *testing.T) {
 	dir := sandbox(t)
 	code, stdout, stderr := run(t, "sync", "--no-input")
