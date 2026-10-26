@@ -35,11 +35,15 @@ commands:
   register <id> [--desc "text"] [--tags a,b]     add file://, alias:// or mcp:// by hand
   describe <tool> [--probe]                      show everything known about a tool
   context                                        print the tool list for agents
+  install [--agent claude,pi,opencode]           put the climan skill where agents load it
 `
 )
 
 // newInteractive builds the TUI chooser.
 var newInteractive = func() syncer.Chooser { return tui.HuhChooser{} }
+
+// pickAgents asks which detected agents to install into.
+var pickAgents = tui.PickAgents
 
 // Run executes climan with args (without the program name) and returns the
 // process exit code.
@@ -63,6 +67,8 @@ func Run(args []string, stdin *os.File, stdout, stderr io.Writer) int {
 		return runDescribe(args[1:], stdout, stderr)
 	case "context":
 		return runContext(args[1:], stdout, stderr)
+	case "install":
+		return runInstall(args[1:], stdin, stdout, stderr)
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return exitOK

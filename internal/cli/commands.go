@@ -10,14 +10,18 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/term"
+
 	"github.com/jasonli0226/climan/internal/describe"
 	"github.com/jasonli0226/climan/internal/discover"
+	"github.com/jasonli0226/climan/internal/install"
 	"github.com/jasonli0226/climan/internal/platform"
 	"github.com/jasonli0226/climan/internal/probe"
 	"github.com/jasonli0226/climan/internal/register"
 	"github.com/jasonli0226/climan/internal/registry"
 	"github.com/jasonli0226/climan/internal/status"
 	"github.com/jasonli0226/climan/internal/view"
+	"github.com/jasonli0226/climan/skills"
 )
 
 func now() time.Time { return time.Now().UTC().Truncate(time.Second) }
@@ -226,4 +230,64 @@ func runDescribe(args []string, stdout, stderr io.Writer) int {
 		return fail(stderr, err)
 	}
 	return exitOK
+}
+
+func runInstall(args []string, stdin *os.File, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("install", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	agentFlag := fs.String("agent", "", "comma-separated agents: claude, pi, opencode")
+	names, err := parseInterleaved(fs, args)
+	if err != nil {
+		return exitUsage
+	}
+	if len(names) > 0 {
+		fmt.Fprintf(stderr, "climan install: unexpected argument %q\n\n%s", names[0], usage)
+		return exitUsage
+	}
+	agentGiven := false
+	fs.Visit(func(f *flag.Flag) { agentGiven = agentGiven || f.Name == "agent" })
+
+	agents := install.Agents(platform.Current())
+	if agentGiven {
+		agents, err = install.Select(agents, strings.Split(*agentFlag, ","))
+		if err != nil {
+			fmt.Fprintf(stderr, "climan install: %v\n", err)
+			return exitUsage
+		}
+	} else {
+		agents, err = pickInstallAgents(agents, stdin)
+		if err != nil {
+			return fail(stderr, err)
+		}
+	}
+
+	code := exitOK
+	for _, r := range install.Install(agents, skills.Climan) {
+		fmt.Fprintln(stdout, r)
+		if r.Outcome == install.Failed {
+			code = exitError
+		}
+	}
+	return code
+}
+
+// pickInstallAgents asks the user to choose among the detected agents.
+// Choosing none returns no agents and no error.
+func pickInstallAgents(agents []install.Agent, stdin *os.File) ([]install.Agent, error) {
+	detected := install.Detected(agents)
+	if len(detected) == 0 {
+		return nil, errors.New("no supported agent found; use --agent claude, pi or opencode")
+	}
+	if !term.IsTerminal(int(stdin.Fd())) {
+		return nil, errors.New("stdin is not a terminal; use --agent")
+	}
+	var names []string
+	for _, a := range detected {
+		names = append(names, a.Name)
+	}
+	picked, err := pickAgents(names)
+	if err != nil || len(picked) == 0 {
+		return nil, err
+	}
+	return install.Select(detected, picked)
 }
