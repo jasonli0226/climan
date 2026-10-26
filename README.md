@@ -77,7 +77,7 @@ an agent by hand, then run `climan install`.
 
 | Command | What it does |
 |---|---|
-| `sync [--batch \| --auto]` | Scan and pick new tools. `--batch` runs without prompts (for cron); `--auto` applies `rules.yaml`. |
+| `sync [--batch \| --no-input \| --auto]` | Scan and pick new tools. `--batch` runs without prompts (for cron), and `--no-input` is the same as `--batch`; `--auto` applies `rules.yaml`. |
 | `enable <tool>... [--desc "text"]` / `ignore <tool>...` | Keep tools, or stop being asked about them. `--desc` sets your own description, which agents see instead of the probed one. |
 | `register <id> [--desc] [--tags a,b]` | Add an entry by hand: a script (`file://...`), alias (`alias://...`), or MCP server (`mcp://...`). |
 | `list [--all \| --pending \| --ignored \| --stale]` | Show kept tools, or other groups. |
