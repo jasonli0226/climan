@@ -46,6 +46,16 @@ func TestListModes(t *testing.T) {
 	}
 }
 
+func TestListUnreviewed(t *testing.T) {
+	r := listReg()
+	r.Tools["rg"].Desc = "fast grep"
+	want := "old (stale)  gone\n" +
+		"zoxide       ? zoxide 0.9.9\n"
+	if got := List(linuxEnv, r, Unreviewed, nil); got != want {
+		t.Fatalf("List =\n%s\nwant\n%s", got, want)
+	}
+}
+
 func TestListMissing(t *testing.T) {
 	r := testReg()
 	r.Tools["file://~/gone"] = &registry.Entry{Status: registry.Enabled, Source: registry.Registered, Desc: "backup"}

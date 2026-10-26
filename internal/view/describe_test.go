@@ -27,6 +27,8 @@ func TestDescriptionWeakSummary(t *testing.T) {
 		{registry.Entry{Summary: "zoxide 0.9.9", Version: "zoxide 0.9.9"}, "zoxide 0.9.9", true},
 		{registry.Entry{Summary: "Usage: tool [x]"}, "Usage: tool [x]", true},
 		{registry.Entry{Summary: "usage tool"}, "usage tool", true},
+		{registry.Entry{Summary: "npm <command>"}, "npm <command>", true},
+		{registry.Entry{Summary: "aws: [ERROR]: arguments are required"}, "aws: [ERROR]: arguments are required", true},
 		{registry.Entry{Summary: "usage-stats tool"}, "usage-stats tool", false},
 		{registry.Entry{Summary: "Search files"}, "Search files", false},
 	}

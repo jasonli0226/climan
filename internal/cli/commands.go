@@ -77,6 +77,7 @@ func runList(args []string, stdout, stderr io.Writer) int {
 	}{
 		{name: "all", mode: view.All}, {name: "pending", mode: view.Pending},
 		{name: "ignored", mode: view.Ignored}, {name: "stale", mode: view.Stale},
+		{name: "unreviewed", mode: view.Unreviewed},
 	}
 	for i := range modes {
 		modes[i].set = fs.Bool(modes[i].name, false, "show "+modes[i].name+" tools")
@@ -93,7 +94,7 @@ func runList(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if len(chosen) > 1 || fs.NArg() > 0 {
-		fmt.Fprintf(stderr, "climan list: use at most one of --all, --pending, --ignored, --stale (got %s)\n",
+		fmt.Fprintf(stderr, "climan list: use at most one of --all, --pending, --ignored, --stale, --unreviewed (got %s)\n",
 			strings.Join(append(chosen, fs.Args()...), " "))
 		return exitUsage
 	}

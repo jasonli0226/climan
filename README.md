@@ -80,7 +80,7 @@ an agent by hand, then run `climan install`.
 | `sync [--batch \| --no-input \| --auto]` | Scan and pick new tools. `--batch` runs without prompts (for cron), and `--no-input` is the same as `--batch`; `--auto` applies `rules.yaml`. |
 | `enable <tool>... [--desc "text"]` / `ignore <tool>...` | Keep tools, or stop being asked about them. `--desc` sets your own description, which agents see instead of the probed one. |
 | `register <id> [--desc] [--tags a,b]` | Add an entry by hand: a script (`file://...`), alias (`alias://...`), or MCP server (`mcp://...`). |
-| `list [--all \| --pending \| --ignored \| --stale]` | Show kept tools, or other groups. |
+| `list [--all \| --pending \| --ignored \| --stale \| --unreviewed]` | Show kept tools, or other groups. `--unreviewed` shows enabled tools with no desc yet, the ones an agent should review. |
 | `context` | Print the short tool list agents read on every task. |
 | `describe <tool> [--probe]` | Show everything known about a tool; `--probe` reruns its `--version` and `--help`. |
 | `install [--agent claude,pi,opencode]` | Put the climan skill in each agent's global skills folder. Never overwrites a skill file without climan's marker line, or a symlink. |

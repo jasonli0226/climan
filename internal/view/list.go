@@ -19,6 +19,7 @@ const (
 	Ignored
 	Stale
 	All
+	Unreviewed // enabled, with no desc from the user or an agent yet
 )
 
 const coreStatus = "core"
@@ -71,6 +72,8 @@ func shows(reg *registry.Registry, key string, e *registry.Entry, mode Mode) boo
 		return e.Status == registry.Ignored
 	case Stale:
 		return reg.Stale(key)
+	case Unreviewed:
+		return e.Status == registry.Enabled && strings.TrimSpace(e.Desc) == ""
 	default:
 		return true
 	}

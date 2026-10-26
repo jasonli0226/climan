@@ -33,7 +33,7 @@ usable tool; check its `--help`.
 You may run these; they only read:
 
 - `climan list` shows enabled tools; a `?` marks a weak or missing
-  description.
+  description. `climan list --unreviewed` shows the ones with no desc yet.
 - `climan describe <tool>` shows everything climan knows about one tool.
   Leave off `--probe`; it reruns the tool and saves the result.
 
@@ -43,6 +43,29 @@ session sees the result:
 - `climan enable <tool> --desc "one line saying what it does"` replaces a
   wrong or missing description. Use it only on a tool already in the list,
   and only after its `--help` shows what the tool does.
+
+## Reviewing descriptions
+
+Do this when the user asks you to review or fix tool descriptions, or right
+after they tell you they ran `climan sync`. Do not start it on your own in
+the middle of other work.
+
+1. Run `climan list --unreviewed`. It shows enabled tools that have no
+   description from the user or an agent yet. The text after each name was
+   guessed from the tool's help output; `?` marks one that is clearly wrong.
+2. For each tool, read its `--help` (then `-h`, then `<tool> help` if the
+   output suggests it). Keep a probed line only if it is accurate.
+   Otherwise draft one line, under about 80 characters, that says what the
+   tool is for, not how to call it.
+3. Show the user every line at once as a list (`tool: line`) and ask which
+   to save. Change nothing before they answer.
+4. For each approved line, run `climan enable <tool> --desc "..."`. A tool
+   with a desc no longer shows in `--unreviewed`.
+
+Keep each line short: every session reads it. If a tool needs more than one
+line (gotchas, the subcommands that matter), tell the user it belongs in
+the `notes:` field of its entry in `~/.config/climan/registry.yaml`, which
+`climan describe` shows.
 
 You may also register a reusable script or alias you wrote for the user, so
 later sessions find it instead of writing it again. It is enabled at once, so

@@ -114,3 +114,46 @@ func TestProbeEnvList(t *testing.T) {
 		t.Fatalf("probeEnv = %s", got)
 	}
 }
+
+func TestProbeEnvDisablesPagers(t *testing.T) {
+	got := strings.Join(probeEnv(testEnv()), " ")
+	for _, want := range []string{"PAGER=cat", "MANPAGER=cat", "AWS_PAGER="} {
+		if !strings.Contains(got, want) {
+			t.Errorf("probeEnv = %s, missing %s", got, want)
+		}
+	}
+}
+
+func TestProbeSkipsErrorLine(t *testing.T) {
+	p := script(t, `case "$1" in --help) printf 'error: missing command\nTool frobs widgets\n';; esac`)
+	if got := Probe(context.Background(), testEnv(), p); got.Summary != "Tool frobs widgets" {
+		t.Fatalf("Summary = %q, want Tool frobs widgets", got.Summary)
+	}
+}
+
+func TestProbeDashHFallback(t *testing.T) {
+	p := script(t, `case "$1" in --help) echo "tool: unknown option --help";; -h) echo "Tool does things well";; esac`)
+	if got := Probe(context.Background(), testEnv(), p); got.Summary != "Tool does things well" {
+		t.Fatalf("Summary = %q, want Tool does things well", got.Summary)
+	}
+}
+
+func TestProbeHelpSubcommandWhenSuggested(t *testing.T) {
+	p := script(t, `case "$1" in
+--help|-h) printf 'tool: [ERROR]: the following arguments are required: command\n\nusage: tool <command>\nTo see help text, you can run:\n\n  tool help\n';;
+help) printf '\033[1mNAME\033[0m\n       tool -\n\n\033[1mDESCRIPTION\033[0m\n       The Tool CLI is a unified tool\n       to manage widgets.\n\nSYNOPSIS\n       tool [options]\n';;
+esac`)
+	got := Probe(context.Background(), testEnv(), p)
+	if want := "The Tool CLI is a unified tool to manage widgets."; got.Summary != want {
+		t.Fatalf("Summary = %q, want %q", got.Summary, want)
+	}
+}
+
+func TestProbeHelpSubcommandNotRunUnlessSuggested(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "ran-help")
+	p := script(t, `case "$1" in --help|-h) echo "usage: tool <file>";; help) touch `+marker+`;; esac`)
+	Probe(context.Background(), testEnv(), p)
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("probe ran `tool help` although the tool never suggested it")
+	}
+}

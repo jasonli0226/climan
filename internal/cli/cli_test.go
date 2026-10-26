@@ -140,6 +140,19 @@ func TestListCommand(t *testing.T) {
 	}
 }
 
+func TestListUnreviewedCommand(t *testing.T) {
+	sandbox(t)
+	mustRun(t, "sync", "--batch")
+	mustRun(t, "enable", "mytool")
+	if out := mustRun(t, "list", "--unreviewed"); !strings.HasPrefix(out, "mytool") {
+		t.Fatalf("list --unreviewed = %q, want mytool", out)
+	}
+	mustRun(t, "enable", "mytool", "--desc", "does my things")
+	if out := mustRun(t, "list", "--unreviewed"); out != "" {
+		t.Fatalf("list --unreviewed after --desc = %q, want empty", out)
+	}
+}
+
 func TestListFlagsExclusive(t *testing.T) {
 	sandbox(t)
 	code, _, stderr := run(t, "list", "--all", "--stale")

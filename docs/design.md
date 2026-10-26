@@ -91,10 +91,14 @@ Rules below were checked against a real Linux PATH (see
 ### 5. Metadata in layers
 
 - **L0, automatic**: name, path, version probe (`--version` with a timeout),
-  first line of `--help`.
-- **L1, lazy**: a one-paragraph description, filled in batch by an LLM on adopt
-  or from the weekly digest prompt. The LLM sits outside the core binary, so
-  climan works offline.
+  and a summary from the help output. The summary is the first line of
+  `--help` that is not an error, or the paragraph under a man-page
+  `DESCRIPTION` heading. While it is weak (empty, the version, a usage or
+  synopsis line, an error), the probe tries `-h`, then `<name> help` if the
+  tool's own output suggested it (aws does).
+- **L1, reviewed**: the `desc` field. The user writes it, or an agent drafts
+  it from `list --unreviewed` and the user approves it (see the skill). The
+  LLM is the agent already in the session, so climan stays offline.
 - **L2, curated**: usage snippets, gotchas, tags.
 
 ### 6. Agent integration is the main feature
@@ -228,7 +232,12 @@ Windows some GUI programs open a window. To limit this:
 - Run each probe with stdin closed (connected to the null device), a 2-second
   timeout that kills the process, output capped at 64 KiB, and a minimal
   environment: `PATH`, `HOME` / `USERPROFILE`, `LANG`, `SystemRoot` (Windows),
-  plus `NO_COLOR=1` and `TERM=dumb`.
+  plus `NO_COLOR=1`, `TERM=dumb`, and `PAGER=cat`, `MANPAGER=cat`,
+  `AWS_PAGER=` so a help command never waits in a pager.
+- Pass a bare word (`help`) only to a tool whose own `--help` or `-h`
+  output contains `<name> help`. Some tools treat a bare word as a file or
+  target. Searching the output for that fixed string is the only way it
+  changes what the probe does.
 - Run the probe in a fresh temp directory as working dir, so a tool that
   writes files writes them there.
 - On Windows, start probes with the `CREATE_NO_WINDOW` flag.
@@ -276,9 +285,9 @@ under 60 entries on a typical machine; the rules above give about 43 here.
 
 ## Open questions
 
-- **Description source.** The first line of `--help` is often a usage line.
-  Consider falling back to `whatis` or the man page.
-- **LLM fill mechanism.** How L1 descriptions are requested: probably an
-  external command hook configured in `config.yaml`. Not needed for v1.
+- **Description source.** `-h`, a suggested `<name> help`, and man-page
+  `DESCRIPTION` sections are tried (see L0). `whatis` is still unused.
+- **Notes from agents.** Reviews set one-line `desc` only; `notes` is
+  edited in the registry file by hand. An `enable --notes` flag may follow.
 - **macOS.** Not a v1 target. brew dirs stay in the interest list for Linux
   (Linuxbrew).

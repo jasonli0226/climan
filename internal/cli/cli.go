@@ -30,6 +30,7 @@ const (
 commands:
   sync [--batch | --no-input | --auto]           scan PATH and pick new tools
   list [--all | --pending | --ignored | --stale] show tools (enabled by default)
+  list --unreviewed                              enabled tools with no desc yet
   enable <tool>... [--desc "text"]               use tools; --desc sets your description
   ignore <tool>...                               stop offering tools
   register <id> [--desc "text"] [--tags a,b]     add file://, alias:// or mcp:// by hand

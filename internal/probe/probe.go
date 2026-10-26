@@ -1,6 +1,6 @@
-// Package probe runs a tool's --version and --help in a restricted
-// environment and keeps the first useful line of each. Probe output is
-// untrusted text: it is cleaned and stored, never interpreted.
+// Package probe runs a tool's --version and help commands in a restricted
+// environment and keeps one useful line of each. Probe output is untrusted
+// text: it is cleaned and stored, and only searched for a `<name> help` hint.
 package probe
 
 import (
@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -28,14 +29,52 @@ const (
 type Info struct{ Version, Summary string }
 
 // Probe runs `path --version` then `path --help`. If --version times out,
-// --help is skipped.
+// nothing else runs. While the summary is still weak it tries `path -h`,
+// then `path help`, but only when the tool's own output suggested
+// `<name> help`: a bare word is not safe to pass to an arbitrary tool.
 func Probe(ctx context.Context, env platform.Env, path string) Info {
-	version, timedOut := run(ctx, env, path, "--version")
+	out, timedOut := run(ctx, env, path, "--version")
 	if timedOut {
 		return Info{}
 	}
-	summary, _ := run(ctx, env, path, "--help")
-	return Info{Version: firstLine(version), Summary: firstLine(summary)}
+	version := firstLine(out)
+	help, timedOut := run(ctx, env, path, "--help")
+	summary := summarize(help)
+	if timedOut || !Weak(summary, version) {
+		return Info{Version: version, Summary: summary}
+	}
+	short, _ := run(ctx, env, path, "-h")
+	if s := summarize(short); !Weak(s, version) {
+		return Info{Version: version, Summary: s}
+	}
+	if suggestsHelp(toolName(env, path), help, short) {
+		long, _ := run(ctx, env, path, "help")
+		if s := summarize(long); !Weak(s, version) {
+			return Info{Version: version, Summary: s}
+		}
+	}
+	return Info{Version: version, Summary: summary}
+}
+
+// suggestsHelp reports whether any output tells the user to run
+// `<name> help`, as aws does.
+func suggestsHelp(name string, outs ...[]byte) bool {
+	re := regexp.MustCompile(`(^|\s)` + regexp.QuoteMeta(name) + ` help(\s|$)`)
+	for _, out := range outs {
+		if re.Match(out) {
+			return true
+		}
+	}
+	return false
+}
+
+// toolName is the command name a tool's help text would use for itself.
+func toolName(env platform.Env, path string) string {
+	name := filepath.Base(path)
+	if env.GOOS == "windows" {
+		name = strings.TrimSuffix(name, filepath.Ext(name))
+	}
+	return name
 }
 
 // run executes path with one argument and returns its output, capped at
@@ -78,7 +117,8 @@ func probeEnv(env platform.Env) []string {
 			out = append(out, k+"="+v)
 		}
 	}
-	return append(out, "NO_COLOR=1", "TERM=dumb")
+	// Pagers would wait on a terminal; `aws help` starts one by default.
+	return append(out, "NO_COLOR=1", "TERM=dumb", "PAGER=cat", "MANPAGER=cat", "AWS_PAGER=")
 }
 
 var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-_]`)
@@ -86,24 +126,72 @@ var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-_]`)
 // firstLine returns the first non-blank line of out with escape sequences
 // and control characters removed, trimmed to lineCap runes.
 func firstLine(out []byte) string {
+	for _, line := range cleanLines(out) {
+		if line != "" {
+			return capLine(line)
+		}
+	}
+	return ""
+}
+
+// summarize picks the line of help output that best describes the tool:
+// the paragraph under a man-page DESCRIPTION heading, else the first line
+// that is not an error message, else the first line.
+func summarize(out []byte) string {
+	lines := cleanLines(out)
+	if d := descriptionSection(lines); d != "" {
+		return capLine(d)
+	}
+	for _, line := range lines {
+		if line != "" && !isError(line) {
+			return capLine(line)
+		}
+	}
+	return firstLine(out)
+}
+
+// descriptionSection joins the lines of the first paragraph after a
+// DESCRIPTION heading, as `aws help` and man pages print it.
+func descriptionSection(lines []string) string {
+	for i, line := range lines {
+		if line != "DESCRIPTION" {
+			continue
+		}
+		var para []string
+		for _, next := range lines[i+1:] {
+			if next == "" && len(para) > 0 {
+				break
+			}
+			if next != "" {
+				para = append(para, next)
+			}
+		}
+		return strings.Join(strings.Fields(strings.Join(para, " ")), " ")
+	}
+	return ""
+}
+
+// cleanLines splits out into lines with escape sequences and control
+// characters removed and surrounding space trimmed.
+func cleanLines(out []byte) []string {
 	text := ansiEscape.ReplaceAllString(string(out), "")
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.Map(func(r rune) rune {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimSpace(strings.Map(func(r rune) rune {
 			if unicode.IsControl(r) {
 				return -1
 			}
 			return r
-		}, line)
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		if r := []rune(line); len(r) > lineCap {
-			line = string(r[:lineCap])
-		}
-		return line
+		}, line))
 	}
-	return ""
+	return lines
+}
+
+func capLine(line string) string {
+	if r := []rune(line); len(r) > lineCap {
+		return string(r[:lineCap])
+	}
+	return line
 }
 
 // capped keeps the first outputCap bytes and silently drops the rest.

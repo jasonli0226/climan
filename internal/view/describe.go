@@ -7,25 +7,19 @@ import (
 	"strings"
 
 	"github.com/jasonli0226/climan/internal/platform"
+	"github.com/jasonli0226/climan/internal/probe"
 	"github.com/jasonli0226/climan/internal/registry"
 )
 
 // Description returns the text to show for e: the user's desc if set,
 // otherwise the probed summary, flattened to one line. weak reports a
-// summary that does not describe the tool (empty, the version line, or a
-// usage line).
+// summary that does not describe the tool (see probe.Weak).
 func Description(e *registry.Entry) (text string, weak bool) {
 	if d := oneLine(e.Desc); d != "" {
 		return d, false
 	}
 	s := oneLine(e.Summary)
-	return s, isWeak(s, oneLine(e.Version))
-}
-
-func isWeak(summary, version string) bool {
-	lower := strings.ToLower(summary)
-	return summary == "" || summary == version ||
-		strings.HasPrefix(lower, "usage:") || strings.HasPrefix(lower, "usage ")
+	return s, probe.Weak(s, oneLine(e.Version))
 }
 
 func oneLine(s string) string {
