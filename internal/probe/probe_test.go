@@ -114,20 +114,3 @@ func TestProbeEnvList(t *testing.T) {
 		t.Fatalf("probeEnv = %s", got)
 	}
 }
-
-func TestHelpCleansAndCaps(t *testing.T) {
-	p := script(t, `printf '\033[1mUsage\033[0m:\tx\n'; i=0; while [ $i -lt 2000 ]; do echo "line $i"; i=$((i+1)); done`)
-	got := Help(context.Background(), testEnv(), p)
-	lines := strings.Split(got, "\n")
-	if !strings.HasPrefix(got, "Usage:    x\n") || len(lines) != 80 || strings.Contains(got, "\x1b") {
-		t.Fatalf("Help: %d lines, starts %q", len(lines), got[:min(len(got), 40)])
-	}
-}
-
-func TestHelpTimeout(t *testing.T) {
-	p := script(t, "sleep 10")
-	start := time.Now()
-	if got := Help(context.Background(), testEnv(), p); got != "" || time.Since(start) > 3*time.Second {
-		t.Fatalf("Help = %q after %v", got, time.Since(start))
-	}
-}

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/jasonli0226/climan/internal/probe"
 	"github.com/jasonli0226/climan/internal/register"
 	"github.com/jasonli0226/climan/internal/registry"
-	"github.com/jasonli0226/climan/internal/skill"
 	"github.com/jasonli0226/climan/internal/status"
 	"github.com/jasonli0226/climan/internal/view"
 )
@@ -228,68 +226,4 @@ func runDescribe(args []string, stdout, stderr io.Writer) int {
 		return fail(stderr, err)
 	}
 	return exitOK
-}
-
-func runSkill(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("skill", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	all := fs.Bool("all", false, "write skills for every enabled tool")
-	out := fs.String("out", "", "output dir (default: skills_dir in config.yaml)")
-	names, err := parseInterleaved(fs, args)
-	if err != nil {
-		return exitUsage
-	}
-	if *all == (len(names) == 1) || len(names) > 1 {
-		fmt.Fprintf(stderr, "climan skill: name one tool or use --all\n\n%s", usage)
-		return exitUsage
-	}
-
-	env, _, reg, err := load()
-	if err != nil {
-		return fail(stderr, err)
-	}
-	outDir, err := skillsDir(env, *out)
-	if err != nil {
-		return fail(stderr, err)
-	}
-	var keys []string
-	if *all {
-		for key, e := range reg.Tools {
-			if e.Status == registry.Enabled && view.Present(env, reg, key) {
-				keys = append(keys, key)
-			}
-		}
-		slices.Sort(keys)
-	} else {
-		key, ok := status.Lookup(env, reg, names[0])
-		if !ok {
-			return fail(stderr, fmt.Errorf("%w: %s", status.ErrUnknown, names[0]))
-		}
-		if e := reg.Tools[key]; e.Status != registry.Enabled {
-			return fail(stderr, fmt.Errorf("%s is %s; enable it first", key, e.Status))
-		}
-		if !view.Present(env, reg, key) {
-			return fail(stderr, fmt.Errorf("%s is not installed now", key))
-		}
-		keys = []string{key}
-	}
-	o := skill.Options{Env: env, Help: probe.Help, Out: stdout}
-	if err := skill.Write(context.Background(), o, reg, keys, outDir); err != nil {
-		return fail(stderr, err)
-	}
-	return exitOK
-}
-
-func skillsDir(env platform.Env, flagValue string) (string, error) {
-	if flagValue != "" {
-		return env.ExpandHome(flagValue), nil
-	}
-	cfg, path, err := platform.LoadConfig(env)
-	if err != nil {
-		return "", err
-	}
-	if cfg.SkillsDir == "" {
-		return "", fmt.Errorf("no output dir: pass --out or set skills_dir in %s", path)
-	}
-	return cfg.SkillsDir, nil
 }
